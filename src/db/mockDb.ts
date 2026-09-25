@@ -13,6 +13,8 @@ export interface Medicine {
   category: string; // الفئة العلاجية
   createdAt: string;
   updatedAt: string;
+  manufacturer?: string; // الشركة المصنعة
+  alternatives?: string; // البدائل المتاحة
 }
 
 export interface DispenseRecord {
@@ -66,7 +68,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "علبة",
     category: "مسكنات وآلام",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "شركة الخليج للصناعات الدوائية (جلفار)",
+    alternatives: "فيفادول بلس، أدول، باراسيتامول"
   },
   {
     id: "med-2",
@@ -78,7 +82,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "علبة",
     category: "مضادات حيوية",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "شركة نوفارتس العالمية (Novartis)",
+    alternatives: "كلافوكس، أموكسيلان، جلمنتين"
   },
   {
     id: "med-3",
@@ -90,7 +96,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "شريط",
     category: "مضادات الالتهاب",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "الشركة السعودية للصناعات الدوائية (سبيماكو الدوائية)",
+    alternatives: "سابوفين، روفيناك، إيبوبروفين"
   },
   {
     id: "med-4",
@@ -102,7 +110,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "علبة",
     category: "الجهاز التنفسي والأزمات",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "شركة الخليج للصناعات الدوائية (جلفار)",
+    alternatives: "بيوتالين بخاخ، سالبوتامول"
   },
   {
     id: "med-5",
@@ -114,7 +124,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "علبة",
     category: "مضادات الصرع والتشنج",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "الشركة السعودية للصناعات الدوائية (سبيماكو الدوائية)",
+    alternatives: "فالبروات الصوديوم، كونفولكس"
   },
   {
     id: "med-6",
@@ -126,7 +138,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "حبة",
     category: "الحساسية ومضادات الهستامين",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "شركة الخليج للصناعات الدوائية (جلفار)",
+    alternatives: "كلاريتين، إيريوس، لورا"
   },
   {
     id: "med-7",
@@ -138,7 +152,9 @@ const INITIAL_MEDICINES: Medicine[] = [
     unit: "علبة",
     category: "الرعاية النفسية والسلوكية",
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    manufacturer: "شركة نوفارتس العالمية (Novartis)",
+    alternatives: "ريسبيدال، ريسبون، ريسبردون"
   }
 ];
 
@@ -307,7 +323,9 @@ export const DbService = {
               unit: med.unit,
               category: med.category || "عام",
               createdAt: med.createdAt,
-              updatedAt: med.updatedAt
+              updatedAt: med.updatedAt,
+              manufacturer: med.manufacturer || '',
+              alternatives: med.alternatives || ''
             });
           }
           saveLocalMedicines(INITIAL_MEDICINES);
@@ -340,7 +358,9 @@ export const DbService = {
           unit: newMed.unit,
           category: newMed.category || "عام",
           createdAt: newMed.createdAt,
-          updatedAt: newMed.updatedAt
+          updatedAt: newMed.updatedAt,
+          manufacturer: newMed.manufacturer || '',
+          alternatives: newMed.alternatives || ''
         });
       }
     } catch (e) {
@@ -393,7 +413,9 @@ export const DbService = {
           unit: updatedMed.unit,
           category: updatedMed.category || "عام",
           createdAt: updatedMed.createdAt,
-          updatedAt: updatedMed.updatedAt
+          updatedAt: updatedMed.updatedAt,
+          manufacturer: updatedMed.manufacturer || '',
+          alternatives: updatedMed.alternatives || ''
         }, { merge: true });
       }
     } catch (e) {

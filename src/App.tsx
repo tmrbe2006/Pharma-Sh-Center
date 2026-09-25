@@ -22,15 +22,15 @@ interface RoleConfig {
 const ROLES: Record<string, RoleConfig> = {
   admin: {
     name: "مدير النظام",
-    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'users', 'security', 'ai_reports', 'audit_logs', 'behavioral_tracker']
+    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'users', 'security', 'ai_reports', 'audit_logs', 'behavioral_tracker', 'alternatives']
   },
   pharmacist: {
     name: "صيدلي ممارس",
-    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'ai_reports', 'audit_logs', 'behavioral_tracker']
+    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'ai_reports', 'audit_logs', 'behavioral_tracker', 'alternatives']
   },
   technician: {
     name: "فني صيدلة",
-    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'audit_logs', 'behavioral_tracker']
+    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'audit_logs', 'behavioral_tracker', 'alternatives']
   }
 };
 
@@ -308,6 +308,9 @@ export default function App() {
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [behaviorSearchQuery, setBehaviorSearchQuery] = useState('');
+  const [dispenseSearchQuery, setDispenseSearchQuery] = useState('');
+  const [residentsSearchQuery, setResidentsSearchQuery] = useState('');
+  const [usersSearchQuery, setUsersSearchQuery] = useState('');
   const [filterBehavior, setFilterBehavior] = useState('all');
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -319,6 +322,57 @@ export default function App() {
   const [showDispenseModal, setShowDispenseModal] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  // Companies Directory States
+  const [inventorySubTab, setInventorySubTab] = useState<'medicines' | 'companies'>('medicines');
+  const [companies, setCompanies] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('care_pharmacy_companies');
+      return saved ? JSON.parse(saved) : [
+        {
+          id: "comp-1",
+          name: "شركة الخليج للصناعات الدوائية (جلفار)",
+          country: "الإمارات العربية المتحدة",
+          contactPerson: "أ. عمر الحوسني",
+          phone: "+97172461461",
+          email: "info@julphar.net",
+          notes: "الوكيل الرئيسي لمسكنات الآلام والمضادات الحيوية بالشرق الأوسط"
+        },
+        {
+          id: "comp-2",
+          name: "الشركة السعودية للصناعات الدوائية (سبيماكو الدوائية)",
+          country: "المملكة العربية السعودية",
+          contactPerson: "د. فيصل العتيبي",
+          phone: "+966114774481",
+          email: "contact@spimaco.com.sa",
+          notes: "المصنع الوطني الأساسي للأدوية المضادة للصرع والاضطرابات السلوكية"
+        },
+        {
+          id: "comp-3",
+          name: "شركة نوفارتس العالمية (Novartis)",
+          country: "سويسرا",
+          contactPerson: "م. سيمون لوران",
+          phone: "+41613241111",
+          email: "swiss.support@novartis.com",
+          notes: "الشركة المصنعة لعقارات ريسبيردال والعلاجات النفسية التخصصية المستوردة"
+        }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const [showCompanyModal, setShowCompanyModal] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [companyForm, setCompanyForm] = useState({
+    name: '',
+    country: '',
+    contactPerson: '',
+    phone: '',
+    email: '',
+    notes: ''
+  });
+  const [companiesSearchQuery, setCompaniesSearchQuery] = useState('');
+
   // Forms fields
   const [medForm, setMedForm] = useState<Omit<Medicine, 'id' | 'createdAt' | 'updatedAt'>>({
     commercialName: '',
@@ -327,7 +381,9 @@ export default function App() {
     expiryDate: '',
     price: 25.0,
     unit: 'علبة',
-    category: 'مسكنات وآلام'
+    category: 'مسكنات وآلام',
+    manufacturer: '',
+    alternatives: ''
   });
   const [selectedMedId, setSelectedMedId] = useState<string | null>(null);
 
@@ -365,7 +421,7 @@ export default function App() {
 
 
   // Custom states for Delete Confirm Modal and Print Preview Modal
-  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string, name: string, type: 'resident' | 'user' | 'behaviorLog' } | null>(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string, name: string, type: 'resident' | 'user' | 'behaviorLog' | 'company' } | null>(null);
   const [printType, setPrintType] = useState<'inventory' | 'aiDossier'>('inventory');
   const [showPrintPreviewModal, setShowPrintPreviewModal] = useState(false);
   
@@ -387,6 +443,18 @@ export default function App() {
   // AI premium report states
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Alternatives tab states
+  const [searchAlternativeQuery, setSearchAlternativeQuery] = useState('');
+  const [selectedAlternativeMed, setSelectedAlternativeMed] = useState<Medicine | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [deleteConfirmCompanyId, setDeleteConfirmCompanyId] = useState<string | null>(null);
+  const [tempAlternative, setTempAlternative] = useState('');
+
+  const getAlternativesArray = (altStr: string | undefined) => {
+    if (!altStr) return [];
+    return altStr.split(/،|,/).map(x => x.trim()).filter(x => x.length > 0);
+  };
 
   // IP detection
   const [clientIp, setClientIp] = useState('127.0.0.1');
@@ -777,7 +845,9 @@ export default function App() {
         expiryDate: '',
         price: 25.0,
         unit: 'علبة',
-        category: 'مسكنات وآلام'
+        category: 'مسكنات وآلام',
+        manufacturer: '',
+        alternatives: ''
       });
     } catch (err) {
       showToast('حدث خطأ فني أثناء إضافة الدواء للمخزن. يرجى مراجعة المدخلات.', 'error');
@@ -794,7 +864,9 @@ export default function App() {
       expiryDate: med.expiryDate,
       price: med.price,
       unit: med.unit,
-      category: med.category || 'مسكنات وآلام'
+      category: med.category || 'مسكنات وآلام',
+      manufacturer: med.manufacturer || '',
+      alternatives: med.alternatives || ''
     });
     setShowEditMedModal(true);
   };
@@ -813,6 +885,18 @@ export default function App() {
       setShowEditMedModal(false);
       showToast(`تم تحديث بيانات الدواء "${updated.commercialName}" بنجاح.`, 'success');
       loadAllData();
+      // Reset
+      setMedForm({
+        commercialName: '',
+        scientificName: '',
+        quantity: 100,
+        expiryDate: '',
+        price: 25.0,
+        unit: 'علبة',
+        category: 'مسكنات وآلام',
+        manufacturer: '',
+        alternatives: ''
+      });
     } catch (err) {
       showToast('فشل تعديل بيانات الدواء في نظام حفظ الملفات.', 'error');
     }
@@ -830,6 +914,45 @@ export default function App() {
     } catch (err) {
       showToast('عذراً، تعذر إتمام عملية الحذف لخلل في قاعدة البيانات.', 'error');
     }
+  };
+
+  // Pharmaceutical Companies CRUD Handlers
+  const handleAddOrEditCompany = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyForm.name) {
+      showToast('يرجى ملء اسم شركة الأدوية أولاً!', 'error');
+      return;
+    }
+    let updated;
+    if (selectedCompanyId) {
+      updated = companies.map(c => c.id === selectedCompanyId ? { ...c, ...companyForm } : c);
+      showToast(`تم تحديث بيانات شركة "${companyForm.name}" بنجاح.`, 'success');
+    } else {
+      const newCompany = {
+        id: `comp-${Date.now()}`,
+        ...companyForm
+      };
+      updated = [newCompany, ...companies];
+      showToast(`تمت إضافة شركة الأدوية "${companyForm.name}" بنجاح.`, 'success');
+    }
+    setCompanies(updated);
+    localStorage.setItem('care_pharmacy_companies', JSON.stringify(updated));
+    setShowCompanyModal(false);
+    setSelectedCompanyId(null);
+    setCompanyForm({ name: '', country: '', contactPerson: '', phone: '', email: '', notes: '' });
+  };
+
+  const openEditCompanyModal = (comp: any) => {
+    setSelectedCompanyId(comp.id);
+    setCompanyForm({
+      name: comp.name,
+      country: comp.country || '',
+      contactPerson: comp.contactPerson || '',
+      phone: comp.phone || '',
+      email: comp.email || '',
+      notes: comp.notes || ''
+    });
+    setShowCompanyModal(true);
   };
 
   // Dispense Form Handler (Updates Medicine quantity, and adds DispenseRecord)
@@ -1399,9 +1522,48 @@ export default function App() {
       .slice(0, 5);
   };
 
+  const getManufacturerStockData = () => {
+    const counts: Record<string, { qty: number; value: number; count: number }> = {};
+    medicines.forEach(m => {
+      const man = m.manufacturer || "غير محددة";
+      if (!counts[man]) {
+        counts[man] = { qty: 0, value: 0, count: 0 };
+      }
+      counts[man].qty += m.quantity;
+      counts[man].value += (m.quantity * m.price);
+      counts[man].count += 1;
+    });
+
+    return Object.entries(counts).map(([name, data]) => ({
+      name,
+      "الكمية المتوفرة": data.qty,
+      "القيمة المالية (ر.س)": Math.round(data.value),
+      "عدد الأصناف": data.count
+    })).sort((a, b) => b["القيمة المالية (ر.س)"] - a["القيمة المالية (ر.س)"]).slice(0, 6);
+  };
+
+  const getManufacturerDispenseData = () => {
+    const counts: Record<string, number> = {};
+    dispenseRecords.forEach(r => {
+      const med = medicines.find(m => m.id === r.medicineId);
+      const man = med?.manufacturer || (r.medicineName.includes('بنادول') ? 'شركة الخليج للصناعات الدوائية (جلفار)' : 'غير محددة');
+      if (!counts[man]) {
+        counts[man] = 0;
+      }
+      counts[man] += r.actualQuantityDispensed;
+    });
+
+    return Object.entries(counts).map(([name, qty]) => ({
+      name,
+      "الكمية المصروفة فعلياً": qty
+    })).sort((a, b) => b["الكمية المصروفة فعلياً"] - a["الكمية المصروفة فعلياً"]).slice(0, 6);
+  };
+
   const monthlyChartData = getMonthlyDispenseData();
   const categoryChartData = getCategoryDistributionData();
   const predictiveForecasts = getPredictiveDepletionForecasting();
+  const manufacturerStockData = getManufacturerStockData();
+  const manufacturerDispenseData = getManufacturerDispenseData();
 
   // Unified Filter logic for Table view
   const getFilteredMedicines = () => {
@@ -1788,6 +1950,14 @@ export default function App() {
               صرف الأدوية
             </button>
           )}
+          {isScreenAllowed('alternatives') && (
+            <button 
+              onClick={() => setActiveTab('alternatives')} 
+              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'alternatives' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              البدائل العلاجية 🔍
+            </button>
+          )}
           {isScreenAllowed('residents') && (
             <button 
               onClick={() => setActiveTab('residents')} 
@@ -1897,6 +2067,11 @@ export default function App() {
         {isScreenAllowed('dispense') && (
           <button onClick={() => setActiveTab('dispense')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'dispense' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
             صرف الأدوية
+          </button>
+        )}
+        {isScreenAllowed('alternatives') && (
+          <button onClick={() => setActiveTab('alternatives')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'alternatives' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            البدائل العلاجية 🔍
           </button>
         )}
         {isScreenAllowed('residents') && (
@@ -2235,6 +2410,100 @@ export default function App() {
 
                 </div>
 
+                {/* 🏢 Pharmaceutical Companies & Manufacturers Analysis (Recharts Powered) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  
+                  {/* Stock Value & Varieties per Manufacturer Bar Chart */}
+                  <div className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                    <div className="space-y-1 mb-6 text-right">
+                      <h3 className="text-base font-bold flex items-center gap-2 text-teal-400">
+                        <Package className="w-5 h-5 text-teal-400" />
+                        <span>تحليل مخزن الصيدلية حسب الشركة المصنعة</span>
+                      </h3>
+                      <p className="text-xs text-slate-400">إجمالي القيمة المالية والكميات المتوفرة في المستودع لكل شركة إنتاج</p>
+                    </div>
+
+                    <div className="h-80 w-full" dir="ltr">
+                      {manufacturerStockData.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-xs text-slate-500">لا توجد بيانات متاحة حالياً</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={manufacturerStockData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#1e293b" : "#e2e8f0"} />
+                            <XAxis 
+                              dataKey="name" 
+                              stroke={darkMode ? "#94a3b8" : "#475569"} 
+                              style={{ fontSize: '9px', fontFamily: 'sans-serif' }}
+                              tickFormatter={(tick) => tick.length > 18 ? tick.substring(0, 18) + '...' : tick}
+                            />
+                            <YAxis 
+                              stroke={darkMode ? "#94a3b8" : "#475569"} 
+                              style={{ fontSize: '10px', fontFamily: 'monospace' }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                                borderColor: darkMode ? '#1e293b' : '#cbd5e1',
+                                borderRadius: '16px',
+                                textAlign: 'right',
+                                fontSize: '12px'
+                              }}
+                            />
+                            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                            <Bar dataKey="القيمة المالية (ر.س)" fill="#0d9488" radius={[8, 8, 0, 0]} />
+                            <Bar dataKey="الكمية المتوفرة" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dispensed Quantities per Manufacturer Bar Chart */}
+                  <div className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                    <div className="space-y-1 mb-6 text-right">
+                      <h3 className="text-base font-bold flex items-center gap-2 text-indigo-400">
+                        <Activity className="w-5 h-5 text-indigo-400 animate-pulse" />
+                        <span>معدلات سحب وصرف أدوية الشركات للمقيمين</span>
+                      </h3>
+                      <p className="text-xs text-slate-400">إجمالي الوحدات والجرعات العلاجية المنصرفة فعلياً والتابعة لإنتاج كل شركة</p>
+                    </div>
+
+                    <div className="h-80 w-full" dir="ltr">
+                      {manufacturerDispenseData.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-xs text-slate-500">لا توجد سجلات صرف مسجلة حالياً لشركات الأدوية</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={manufacturerDispenseData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={darkMode ? "#1e293b" : "#e2e8f0"} />
+                            <XAxis 
+                              dataKey="name" 
+                              stroke={darkMode ? "#94a3b8" : "#475569"} 
+                              style={{ fontSize: '9px', fontFamily: 'sans-serif' }}
+                              tickFormatter={(tick) => tick.length > 18 ? tick.substring(0, 18) + '...' : tick}
+                            />
+                            <YAxis 
+                              stroke={darkMode ? "#94a3b8" : "#475569"} 
+                              style={{ fontSize: '10px', fontFamily: 'monospace' }}
+                            />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                                borderColor: darkMode ? '#1e293b' : '#cbd5e1',
+                                borderRadius: '16px',
+                                textAlign: 'right',
+                                fontSize: '12px'
+                              }}
+                            />
+                            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                            <Bar dataKey="الكمية المصروفة فعلياً" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+
                 {/* Forecasting & Near-Expiry alerts row */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -2400,145 +2669,500 @@ export default function App() {
             {activeTab === 'inventory' && (
               <div className="space-y-6 animate-fade-in">
                 
-                {/* Search & Actions block */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  
-                  {/* Search Bar & Filters */}
-                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    <div className={`relative flex items-center rounded-xl px-3 py-2 border w-full sm:w-80 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
-                      <Search className="w-4 h-4 text-slate-400 shrink-0" />
-                      <input 
-                        type="text"
-                        placeholder="ابحث بالاسم التجاري أو العلمي..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
-                      />
+                {/* Segmented Control Sub-Tabs */}
+                <div className="flex items-center gap-1 p-1 bg-slate-900/60 border border-slate-800 rounded-xl w-fit">
+                  <button
+                    onClick={() => setInventorySubTab('medicines')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${
+                      inventorySubTab === 'medicines'
+                        ? 'bg-teal-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Package className="w-4 h-4 shrink-0" />
+                    <span>دليل الأدوية والمخزون</span>
+                  </button>
+                  <button
+                    onClick={() => setInventorySubTab('companies')}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors flex items-center gap-2 cursor-pointer ${
+                      inventorySubTab === 'companies'
+                        ? 'bg-teal-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Activity className="w-4 h-4 shrink-0" />
+                    <span>شركات الأدوية المصنعة</span>
+                  </button>
+                </div>
+
+                {inventorySubTab === 'medicines' ? (
+                  <div className="space-y-6">
+                    {/* Search & Actions block */}
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      
+                      {/* Search Bar & Filters */}
+                      <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                        <div className={`relative flex items-center rounded-xl px-3 py-2 border w-full sm:w-80 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
+                          <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                          <input 
+                            type="text"
+                            placeholder="ابحث بالاسم التجاري أو العلمي..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                          />
+                        </div>
+
+                        <select
+                          value={selectedCategory}
+                          onChange={(e) => setSelectedCategory(e.target.value)}
+                          className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
+                        >
+                          <option value="all">كل الفئات العلاجية</option>
+                          {categories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={selectedStockFilter}
+                          onChange={(e) => setSelectedStockFilter(e.target.value)}
+                          className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
+                        >
+                          <option value="all">كل المخزون</option>
+                          <option value="critical">المخزون الحرج (≤ 15 وحدة)</option>
+                          <option value="expired">منتهية الصلاحية</option>
+                          <option value="expiring_soon">قريبة انتهاء الصلاحية</option>
+                        </select>
+                      </div>
+
+                      {/* Add item trigger */}
+                      <button
+                        onClick={() => setShowAddMedModal(true)}
+                        className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow-lg shadow-teal-900/20 transition-all flex items-center gap-2"
+                      >
+                        <Plus className="w-4.5 h-4.5" />
+                        <span>إضافة دواء جديد</span>
+                      </button>
+
                     </div>
 
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
-                    >
-                      <option value="all">كل الفئات العلاجية</option>
-                      {categories.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-
-                    <select
-                      value={selectedStockFilter}
-                      onChange={(e) => setSelectedStockFilter(e.target.value)}
-                      className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
-                    >
-                      <option value="all">كل المخزون</option>
-                      <option value="critical">المخزون الحرج (≤ 15 وحدة)</option>
-                      <option value="expired">منتهية الصلاحية</option>
-                      <option value="expiring_soon">قريبة انتهاء الصلاحية</option>
-                    </select>
-                  </div>
-
-                  {/* Add item trigger */}
-                  <button
-                    onClick={() => setShowAddMedModal(true)}
-                    className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow-lg shadow-teal-900/20 transition-all flex items-center gap-2"
-                  >
-                    <Plus className="w-4.5 h-4.5" />
-                    <span>إضافة دواء جديد</span>
-                  </button>
-
-                </div>
-
-                {/* Inventory Table Card */}
-                <div className={`rounded-3xl border overflow-hidden ${darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-right text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-800/80 text-slate-400 font-black tracking-wide">
-                          <th className="p-4">الاسم التجاري</th>
-                          <th className="p-4">الاسم العلمي</th>
-                          <th className="p-4">الفئة العلاجية</th>
-                          <th className="p-4">الكمية المتوفرة</th>
-                          <th className="p-4">الوحدة</th>
-                          <th className="p-4">سعر الوحدة</th>
-                          <th className="p-4">تاريخ انتهاء الصلاحية</th>
-                          <th className="p-4">حالة الصنف</th>
-                          <th className="p-4 text-left print:hidden">إجراءات</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/40">
-                        {filteredMedicines.length === 0 ? (
-                          <tr>
-                            <td colSpan={9} className="p-10 text-center text-slate-400">
-                              <Package className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                              <span className="font-semibold text-sm">عذراً، لم يتم العثور على أي أدوية تطابق الفلتر الحالي.</span>
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredMedicines.map((med) => {
-                            const exp = new Date(med.expiryDate);
-                            const today = new Date();
-                            const soon = new Date();
-                            soon.setDate(soon.getDate() + alertDays);
-
-                            let statusText = "مستقر وصالح";
-                            let statusColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
-                            
-                            if (exp <= today) {
-                              statusText = "منتهي الصلاحية";
-                              statusColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
-                            } else if (exp <= soon) {
-                              statusText = "قريب الانتهاء";
-                              statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
-                            }
-
-                            return (
-                              <tr key={med.id} className="hover:bg-slate-900/10 transition">
-                                <td className="p-4 font-black text-teal-400 text-sm">{med.commercialName}</td>
-                                <td className="p-4 font-mono text-slate-300">{med.scientificName}</td>
-                                <td className="p-4 text-slate-400">{med.category}</td>
-                                <td className="p-4 font-mono font-bold text-slate-100">
-                                  <span className={med.quantity <= 15 ? 'text-orange-400 animate-pulse bg-orange-400/10 px-2 py-0.5 rounded-md' : ''}>
-                                    {med.quantity}
-                                  </span>
-                                </td>
-                                <td className="p-4 text-slate-400">{med.unit}</td>
-                                <td className="p-4 font-mono text-slate-300 font-semibold">{med.price} ر.س</td>
-                                <td className="p-4 font-mono text-slate-300">{med.expiryDate}</td>
-                                <td className="p-4">
-                                  <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${statusColor}`}>
-                                    {statusText}
-                                  </span>
-                                </td>
-                                <td className="p-4 text-left print:hidden">
-                                  <div className="inline-flex items-center gap-1">
-                                    <button
-                                      onClick={() => openEditModal(med)}
-                                      className="p-1.5 rounded-lg text-teal-400 hover:bg-slate-800 transition"
-                                      title="تعديل"
-                                    >
-                                      <Edit2 className="w-4 h-4" />
-                                    </button>
-                                    
-                                    <button
-                                      onClick={() => setDeleteConfirmId(med.id)}
-                                      className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
-                                      title="حذف"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </div>
+                    {/* Inventory Table Card */}
+                    <div className={`rounded-3xl border overflow-hidden ${darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-right text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-800/80 text-slate-400 font-black tracking-wide">
+                              <th className="p-4">الاسم التجاري والشركة المصنعة</th>
+                              <th className="p-4">الاسم العلمي والبدائل</th>
+                              <th className="p-4">الفئة العلاجية</th>
+                              <th className="p-4">الكمية المتوفرة</th>
+                              <th className="p-4">الوحدة</th>
+                              <th className="p-4">سعر الوحدة</th>
+                              <th className="p-4">تاريخ انتهاء الصلاحية</th>
+                              <th className="p-4">حالة الصنف</th>
+                              <th className="p-4 text-left print:hidden">إجراءات</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/40">
+                            {filteredMedicines.length === 0 ? (
+                              <tr>
+                                <td colSpan={9} className="p-10 text-center text-slate-400">
+                                  <Package className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                                  <span className="font-semibold text-sm">عذراً، لم يتم العثور على أي أدوية تطابق الفلتر الحالي.</span>
                                 </td>
                               </tr>
-                            );
-                          })
-                        )}
-                      </tbody>
-                    </table>
+                            ) : (
+                              filteredMedicines.map((med) => {
+                                const exp = new Date(med.expiryDate);
+                                const today = new Date();
+                                const soon = new Date();
+                                soon.setDate(soon.getDate() + alertDays);
+
+                                let statusText = "مستقر وصالح";
+                                let statusColor = "text-emerald-400 bg-emerald-500/10 border-emerald-500/20";
+                                
+                                if (exp <= today) {
+                                  statusText = "منتهي الصلاحية";
+                                  statusColor = "text-rose-400 bg-rose-500/10 border-rose-500/20";
+                                } else if (exp <= soon) {
+                                  statusText = "قريب الانتهاء";
+                                  statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20";
+                                }
+
+                                return (
+                                  <tr key={med.id} className="hover:bg-slate-900/10 transition">
+                                    <td className="p-4 text-sm font-black text-teal-400">
+                                      <div>{med.commercialName}</div>
+                                      {med.manufacturer ? (
+                                        <div className="text-[10px] text-slate-400 font-normal mt-0.5">
+                                          الشركة: {med.manufacturer}
+                                        </div>
+                                      ) : (
+                                        <div className="text-[10px] text-slate-600 font-normal mt-0.5">
+                                          الشركة: غير محددة
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-4 font-mono text-slate-300">
+                                      <div>{med.scientificName}</div>
+                                      {med.alternatives ? (
+                                        <div className="text-[10px] text-slate-400 font-sans mt-0.5">
+                                          البدائل: {med.alternatives}
+                                        </div>
+                                      ) : (
+                                        <div className="text-[10px] text-slate-600 font-sans mt-0.5">
+                                          البدائل: لا توجد بدائل مسجلة
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="p-4 text-slate-400">{med.category}</td>
+                                    <td className="p-4 font-mono font-bold text-slate-100">
+                                      <span className={med.quantity <= 15 ? 'text-orange-400 animate-pulse bg-orange-400/10 px-2 py-0.5 rounded-md' : ''}>
+                                        {med.quantity}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-slate-400">{med.unit}</td>
+                                    <td className="p-4 font-mono text-slate-300 font-semibold">{med.price} ر.س</td>
+                                    <td className="p-4 font-mono text-slate-300">{med.expiryDate}</td>
+                                    <td className="p-4">
+                                      <span className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border ${statusColor}`}>
+                                        {statusText}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-left print:hidden">
+                                      <div className="inline-flex items-center gap-1">
+                                        <button
+                                          onClick={() => openEditModal(med)}
+                                          className="p-1.5 rounded-lg text-teal-400 hover:bg-slate-800 transition"
+                                          title="تعديل"
+                                        >
+                                          <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        
+                                        <button
+                                          onClick={() => setDeleteConfirmId(med.id)}
+                                          className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
+                                          title="حذف"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Companies Actions & Search bar */}
+                    <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
+                      <div className={`flex-1 max-w-md relative flex items-center rounded-xl px-3 py-2 border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
+                        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                        <input 
+                          type="text"
+                          placeholder="ابحث باسم الشركة، بلد التصنيع، البريد..."
+                          value={companiesSearchQuery}
+                          onChange={(e) => setCompaniesSearchQuery(e.target.value)}
+                          className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                        />
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedCompanyId(null);
+                          setCompanyForm({ name: '', country: '', contactPerson: '', phone: '', email: '', notes: '' });
+                          setShowCompanyModal(true);
+                        }}
+                        className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Plus className="w-4.5 h-4.5" />
+                        <span>إضافة شركة أدوية جديدة</span>
+                      </button>
+                    </div>
+
+                    {/* Companies Table */}
+                    <div className={`rounded-3xl border overflow-hidden ${darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-right text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400 font-bold">
+                              <th className="p-4">اسم الشركة المصنعة</th>
+                              <th className="p-4">بلد التصنيع/المنشأ</th>
+                              <th className="p-4">مسؤول التواصل</th>
+                              <th className="p-4">رقم الهاتف</th>
+                              <th className="p-4">البريد الإلكتروني</th>
+                              <th className="p-4">ملاحظات ووكلاء التوزيع</th>
+                              <th className="p-4 text-left">إجراءات</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/40">
+                            {companies.filter(c => {
+                              const query = companiesSearchQuery.trim().toLowerCase();
+                              if (!query) return true;
+                              return (
+                                (c.name || '').toLowerCase().includes(query) ||
+                                (c.country || '').toLowerCase().includes(query) ||
+                                (c.contactPerson || '').toLowerCase().includes(query) ||
+                                (c.email || '').toLowerCase().includes(query) ||
+                                (c.phone || '').toLowerCase().includes(query) ||
+                                (c.notes || '').toLowerCase().includes(query)
+                              );
+                            }).length === 0 ? (
+                              <tr>
+                                <td colSpan={7} className="p-10 text-center text-slate-400">
+                                  <Package className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                                  <span>لا توجد شركات أدوية مسجلة تطابق بحثك حالياً.</span>
+                                </td>
+                              </tr>
+                            ) : (
+                              companies.filter(c => {
+                                const query = companiesSearchQuery.trim().toLowerCase();
+                                if (!query) return true;
+                                return (
+                                  (c.name || '').toLowerCase().includes(query) ||
+                                  (c.country || '').toLowerCase().includes(query) ||
+                                  (c.contactPerson || '').toLowerCase().includes(query) ||
+                                  (c.email || '').toLowerCase().includes(query) ||
+                                  (c.phone || '').toLowerCase().includes(query) ||
+                                  (c.notes || '').toLowerCase().includes(query)
+                                );
+                              }).map((c) => (
+                                <tr key={c.id} className="hover:bg-slate-900/10">
+                                  <td className="p-4 font-black text-slate-200 text-sm">{c.name}</td>
+                                  <td className="p-4 text-slate-300 font-semibold">{c.country || '-'}</td>
+                                  <td className="p-4 text-slate-400">{c.contactPerson || '-'}</td>
+                                  <td className="p-4 font-mono text-slate-400">{c.phone || '-'}</td>
+                                  <td className="p-4 font-mono text-slate-400">{c.email || '-'}</td>
+                                  <td className="p-4 text-slate-400 max-w-xs truncate" title={c.notes}>{c.notes || '-'}</td>
+                                  <td className="p-4 text-left">
+                                    <div className="flex gap-2 justify-end">
+                                      <button 
+                                        onClick={() => openEditCompanyModal(c)}
+                                        className="p-1.5 bg-slate-855 hover:bg-slate-800 text-teal-400 rounded-lg hover:text-white transition cursor-pointer"
+                                        title="تعديل بيانات الشركة"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button 
+                                        onClick={() => setDeleteConfirmCompanyId(c.id)}
+                                        className="p-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition cursor-pointer"
+                                        title="حذف الشركة"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* ----------------- TAB: ALTERNATIVES (البدائل العلاجية) ----------------- */}
+            {activeTab === 'alternatives' && (
+              <div className="space-y-6 animate-fade-in text-right" dir="rtl">
+                <div className="flex justify-between items-center pb-4 border-b border-slate-800">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-200 flex items-center gap-2">
+                      <Sparkles className="w-6 h-6 text-teal-400" />
+                      <span>🔍 دليل بدائل الأدوية الذكي</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">ابحث عن أي دواء لمعرفة بدائله العلاجية المتوفرة وحالة المخزون العيني له</p>
                   </div>
                 </div>
 
+                <div className={`p-6 rounded-3xl border relative ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 text-slate-900'}`}>
+                  <label className="block text-slate-400 mb-2 font-bold text-xs">اختر أو ابحث عن اسم الدواء التجاري أو العلمي:</label>
+                  
+                  {/* Searchable Combobox */}
+                  <div className="relative max-w-xl">
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        placeholder="اكتب اسم الدواء التجاري أو العلمي للبحث..."
+                        value={searchAlternativeQuery}
+                        onChange={(e) => {
+                          setSearchAlternativeQuery(e.target.value);
+                          setDropdownOpen(true);
+                        }}
+                        onFocus={() => setDropdownOpen(true)}
+                        className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none pr-10 text-right"
+                      />
+                      <Search className="w-5 h-5 text-slate-500 absolute right-3" />
+                      
+                      {searchAlternativeQuery && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchAlternativeQuery('');
+                            setSelectedAlternativeMed(null);
+                          }}
+                          className="absolute left-3 text-slate-400 hover:text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dropdown list */}
+                    {dropdownOpen && (
+                      <div className="absolute z-10 w-full mt-2 rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-900 scrollbar-none">
+                        {medicines
+                          .filter(m => 
+                            m.commercialName.toLowerCase().includes(searchAlternativeQuery.toLowerCase()) ||
+                            m.scientificName.toLowerCase().includes(searchAlternativeQuery.toLowerCase())
+                          )
+                          .map(m => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedAlternativeMed(m);
+                                setSearchAlternativeQuery(m.commercialName);
+                                setDropdownOpen(false);
+                              }}
+                              className="w-full px-4 py-3 text-right text-xs text-slate-300 hover:bg-slate-900 hover:text-white transition flex justify-between items-center cursor-pointer"
+                            >
+                              <div>
+                                <span className="font-bold text-slate-200">{m.commercialName}</span>
+                                <span className="text-slate-500 mr-2">({m.scientificName})</span>
+                              </div>
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                                {m.category}
+                              </span>
+                            </button>
+                          ))}
+                        {medicines.filter(m => 
+                          m.commercialName.toLowerCase().includes(searchAlternativeQuery.toLowerCase()) ||
+                          m.scientificName.toLowerCase().includes(searchAlternativeQuery.toLowerCase())
+                        ).length === 0 && (
+                          <div className="p-4 text-center text-xs text-slate-500">لا يوجد أدوية تطابق هذا البحث</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Medicine details & alternatives display */}
+                {selectedAlternativeMed ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Selected Medicine Info Card */}
+                    <div className={`p-6 rounded-3xl border lg:col-span-1 flex flex-col justify-between ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 text-slate-900'}`}>
+                      <div className="space-y-4">
+                        <div className="pb-3 border-b border-slate-800">
+                          <span className="text-[10px] px-2.5 py-1 bg-teal-500/10 text-teal-400 rounded-full font-bold border border-teal-500/20">{selectedAlternativeMed.category}</span>
+                          <h3 className="text-base font-black text-slate-200 mt-2">{selectedAlternativeMed.commercialName}</h3>
+                          <p className="text-xs text-slate-400 font-mono italic mt-0.5">{selectedAlternativeMed.scientificName}</p>
+                        </div>
+
+                        <div className="space-y-3 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400">الشركة المصنعة:</span>
+                            <span className="font-semibold text-slate-200">{selectedAlternativeMed.manufacturer || 'غير محددة'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400">الكمية المتوفرة حالياً:</span>
+                            <span className={`font-mono font-bold px-2 py-0.5 rounded ${selectedAlternativeMed.quantity <= 15 ? 'text-orange-400 bg-orange-400/10' : 'text-slate-200 bg-slate-950/40 border border-slate-800'}`}>
+                              {selectedAlternativeMed.quantity} {selectedAlternativeMed.unit}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400">تاريخ انتهاء الصلاحية:</span>
+                            <span className="font-mono text-slate-200">{selectedAlternativeMed.expiryDate}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-slate-400">سعر الوحدة:</span>
+                            <span className="font-mono text-slate-200">{selectedAlternativeMed.price} ر.س</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Alternatives Card */}
+                    <div className={`p-6 rounded-3xl border lg:col-span-2 space-y-4 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 text-slate-900'}`}>
+                      <h3 className="text-sm font-black text-teal-400 border-b border-slate-800 pb-3 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-teal-400 animate-pulse" />
+                        <span>البدائل العلاجية المتاحة والمقترحة في النظام:</span>
+                      </h3>
+
+                      {selectedAlternativeMed.alternatives ? (
+                        <div className="space-y-4">
+                          <p className="text-xs text-slate-300 leading-relaxed">
+                            تم تدوين البدائل التالية لهذا الدواء كبدائل علاجية بديلة يمكن صرفها عند الحاجة ونفاد المخزون:
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {selectedAlternativeMed.alternatives.split(/،|,/).map((alt, idx) => {
+                              const altName = alt.trim();
+                              // Check if we have another medicine in our database that matches
+                              const matchedMed = medicines.find(m => 
+                                m.commercialName.toLowerCase().includes(altName.toLowerCase()) ||
+                                m.scientificName.toLowerCase().includes(altName.toLowerCase()) ||
+                                altName.toLowerCase().includes(m.commercialName.toLowerCase())
+                              );
+
+                              return (
+                                <div key={idx} className="p-4 rounded-2xl bg-slate-950 border border-slate-850 flex flex-col justify-between space-y-3">
+                                  <div>
+                                    <h4 className="font-black text-slate-200 text-xs">{altName}</h4>
+                                    <p className="text-[10px] text-slate-500 mt-1">اسم البديل المسجل</p>
+                                  </div>
+                                  
+                                  {matchedMed ? (
+                                    <div className="pt-2 border-t border-slate-800 text-[11px] space-y-2">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-emerald-400 font-bold">متوفر في المستودع ✅</span>
+                                        <span className="font-bold text-slate-200 font-mono">{matchedMed.quantity} {matchedMed.unit}</span>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedAlternativeMed(matchedMed);
+                                          setSearchAlternativeQuery(matchedMed.commercialName);
+                                        }}
+                                        className="w-full text-center text-[10px] bg-slate-900 hover:bg-slate-800 text-teal-400 py-1.5 rounded-xl transition mt-1 cursor-pointer font-bold border border-slate-800"
+                                      >
+                                        انقر لعرض تفاصيل هذا البديل 🔍
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="pt-2 border-t border-slate-900 text-[11px] text-rose-400/80 flex justify-between items-center">
+                                      <span>غير متوفر بالمستودع عيناً ❌</span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center p-8 text-center space-y-2">
+                          <AlertTriangle className="w-10 h-10 text-orange-400" />
+                          <h4 className="font-bold text-slate-300">لا توجد بدائل مسجلة لهذا الدواء</h4>
+                          <p className="text-xs text-slate-500">يمكنك الدخول إلى إدارة المخزن وتعديل بيانات الدواء لإدخال بدائل طبية وعلاجية له.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-slate-800 rounded-3xl bg-slate-900/10">
+                    <Search className="w-12 h-12 text-slate-700 animate-pulse mb-3" />
+                    <h3 className="font-bold text-slate-300 text-sm">لم يتم اختيار أي دواء بعد</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mt-1 leading-relaxed">استخدم مربع البحث بالأعلى لاختيار دواء، وسيعرض لك النظام كافة التفاصيل وبدائله العلاجية وحالة توفرها في المخزن العيني.</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2554,16 +3178,30 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                   <h3 className="text-lg font-bold text-slate-200">سجل عمليات صرف الأدوية للمقيمين بالمركز</h3>
                   
-                  <button
-                    onClick={() => setShowDispenseModal(true)}
-                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center gap-2"
-                  >
-                    <Plus className="w-4.5 h-4.5" />
-                    <span>تسجيل صرف دواء جديد لمقيم</span>
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1 sm:flex-initial sm:min-w-[420px]">
+                    {/* Search Bar */}
+                    <div className={`flex-1 relative flex items-center rounded-xl px-3 py-2 border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
+                      <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                      <input 
+                        type="text"
+                        placeholder="ابحث باسم المقيم، اسم الدواء، أو الصيدلي..."
+                        value={dispenseSearchQuery}
+                        onChange={(e) => setDispenseSearchQuery(e.target.value)}
+                        className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => setShowDispenseModal(true)}
+                      className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4.5 h-4.5" />
+                      <span className="whitespace-nowrap">تسجيل صرف دواء جديد لمقيم</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Dispense Records Table */}
@@ -2583,15 +3221,33 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/40">
-                        {dispenseRecords.length === 0 ? (
+                        {dispenseRecords.filter(rec => {
+                          const query = dispenseSearchQuery.trim().toLowerCase();
+                          if (!query) return true;
+                          return (
+                            (rec.residentName || '').toLowerCase().includes(query) ||
+                            (rec.medicineName || '').toLowerCase().includes(query) ||
+                            (rec.dispensedBy || '').toLowerCase().includes(query) ||
+                            (rec.unit || '').toLowerCase().includes(query)
+                          );
+                        }).length === 0 ? (
                           <tr>
                             <td colSpan={8} className="p-10 text-center text-slate-400">
                               <HelpCircle className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                              <span>لا توجد سجلات صرف مسجلة حالياً في النظام.</span>
+                              <span>لا توجد سجلات صرف تطابق خيارات البحث المحددة.</span>
                             </td>
                           </tr>
                         ) : (
-                          dispenseRecords.map((rec) => (
+                          dispenseRecords.filter(rec => {
+                            const query = dispenseSearchQuery.trim().toLowerCase();
+                            if (!query) return true;
+                            return (
+                              (rec.residentName || '').toLowerCase().includes(query) ||
+                              (rec.medicineName || '').toLowerCase().includes(query) ||
+                              (rec.dispensedBy || '').toLowerCase().includes(query) ||
+                              (rec.unit || '').toLowerCase().includes(query)
+                            );
+                          }).map((rec) => (
                             <tr key={rec.id} className="hover:bg-slate-900/10">
                               <td className="p-4 font-black text-slate-200 text-sm">{rec.residentName}</td>
                               <td className="p-4 font-bold text-teal-400">{rec.medicineName}</td>
@@ -3865,22 +4521,37 @@ export default function App() {
             {/* ----------------- TAB: RESIDENTS ----------------- */}
             {activeTab === 'residents' && (
               <div className="space-y-6 animate-fade-in">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                   <div>
                     <h2 className="text-xl font-black text-slate-200">👥 إدارة المقيمين بمركز الرعاية</h2>
                     <p className="text-xs text-slate-400">إضافة وتعديل وحذف بيانات نزلاء المركز وتتبع سجلات صرف أدويتهم</p>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setResidentForm({ name: '', roomNumber: '', nationalId: '', age: 72, notes: '' });
-                      setSelectedResidentId(null);
-                      setShowAddResidentModal(true);
-                    }}
-                    className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>إضافة مقيم جديد</span>
-                  </button>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1 sm:flex-initial sm:min-w-[420px]">
+                    {/* Search Bar */}
+                    <div className={`flex-1 relative flex items-center rounded-xl px-3 py-2 border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
+                      <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                      <input 
+                        type="text"
+                        placeholder="ابحث باسم المقيم، رقم الغرفة، أو الهوية..."
+                        value={residentsSearchQuery}
+                        onChange={(e) => setResidentsSearchQuery(e.target.value)}
+                        className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        setResidentForm({ name: '', roomNumber: '', nationalId: '', age: 72, notes: '' });
+                        setSelectedResidentId(null);
+                        setShowAddResidentModal(true);
+                      }}
+                      className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>إضافة مقيم جديد</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -3897,53 +4568,80 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/40">
-                        {residents.map((res) => (
-                          <tr key={res.id} className="hover:bg-slate-900/25 transition">
-                            <td className="py-3.5 font-bold text-slate-200">{res.name}</td>
-                            <td className="py-3.5 font-semibold text-teal-400">{res.roomNumber}</td>
-                            <td className="py-3.5 font-mono text-slate-400">{res.nationalId || '-'}</td>
-                            <td className="py-3.5 font-mono text-slate-300">{res.age} سنة</td>
-                            <td className="py-3.5 text-slate-400 text-[11px] max-w-xs truncate" title={res.notes}>{res.notes || 'لا توجد ملاحظات خاصة'}</td>
-                            <td className="py-3.5 text-left">
-                              <div className="flex gap-2 justify-end items-center">
-                                <button 
-                                  onClick={() => {
-                                    setActiveDossierResident(res);
-                                  }}
-                                  title="عرض الملف الطبي التفاعلي وجدول الجرعات اليومي"
-                                  className="px-2.5 py-1.5 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer font-bold text-[10px]"
-                                >
-                                  <Activity className="w-3.5 h-3.5" />
-                                  <span>الملف الطبي 🩺</span>
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setSelectedResidentId(res.id);
-                                    setResidentForm({
-                                      name: res.name,
-                                      roomNumber: res.roomNumber,
-                                      nationalId: res.nationalId || '',
-                                      age: res.age,
-                                      notes: res.notes || ''
-                                    });
-                                    setShowEditResidentModal(true);
-                                  }}
-                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg hover:text-white transition cursor-pointer"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    setDeleteConfirmTarget({ id: res.id, name: res.name, type: 'resident' });
-                                  }}
-                                  className="p-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                        {residents.filter(res => {
+                          const query = residentsSearchQuery.trim().toLowerCase();
+                          if (!query) return true;
+                          return (
+                            (res.name || '').toLowerCase().includes(query) ||
+                            (res.roomNumber || '').toLowerCase().includes(query) ||
+                            (res.nationalId || '').toLowerCase().includes(query) ||
+                            (res.notes || '').toLowerCase().includes(query)
+                          );
+                        }).length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-10 text-center text-slate-400">
+                              <HelpCircle className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                              <span>لا يوجد مقيمون يطابقون خيارات البحث المحددة.</span>
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          residents.filter(res => {
+                            const query = residentsSearchQuery.trim().toLowerCase();
+                            if (!query) return true;
+                            return (
+                              (res.name || '').toLowerCase().includes(query) ||
+                              (res.roomNumber || '').toLowerCase().includes(query) ||
+                              (res.nationalId || '').toLowerCase().includes(query) ||
+                              (res.notes || '').toLowerCase().includes(query)
+                            );
+                          }).map((res) => (
+                            <tr key={res.id} className="hover:bg-slate-900/25 transition">
+                              <td className="py-3.5 font-bold text-slate-200">{res.name}</td>
+                              <td className="py-3.5 font-semibold text-teal-400">{res.roomNumber}</td>
+                              <td className="py-3.5 font-mono text-slate-400">{res.nationalId || '-'}</td>
+                              <td className="py-3.5 font-mono text-slate-300">{res.age} سنة</td>
+                              <td className="py-3.5 text-slate-400 text-[11px] max-w-xs truncate" title={res.notes}>{res.notes || 'لا توجد ملاحظات خاصة'}</td>
+                              <td className="py-3.5 text-left">
+                                <div className="flex gap-2 justify-end items-center">
+                                  <button 
+                                    onClick={() => {
+                                      setActiveDossierResident(res);
+                                    }}
+                                    title="عرض الملف الطبي التفاعلي وجدول الجرعات اليومي"
+                                    className="px-2.5 py-1.5 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer font-bold text-[10px]"
+                                  >
+                                    <Activity className="w-3.5 h-3.5" />
+                                    <span>الملف الطبي 🩺</span>
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedResidentId(res.id);
+                                      setResidentForm({
+                                        name: res.name,
+                                        roomNumber: res.roomNumber,
+                                        nationalId: res.nationalId || '',
+                                        age: res.age,
+                                        notes: res.notes || ''
+                                      });
+                                      setShowEditResidentModal(true);
+                                    }}
+                                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg hover:text-white transition cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      setDeleteConfirmTarget({ id: res.id, name: res.name, type: 'resident' });
+                                    }}
+                                    className="p-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -4282,22 +4980,37 @@ export default function App() {
             {/* ----------------- TAB: USERS ----------------- */}
             {activeTab === 'users' && (
               <div className="space-y-6 animate-fade-in">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                   <div>
                     <h2 className="text-xl font-black text-slate-200">👤 إدارة مستخدمي الصيدلية والنظام</h2>
                     <p className="text-xs text-slate-400">إضافة وتعديل وحذف حسابات الصيادلة والمشرفين بالمركز</p>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setUserForm({ name: '', email: '', role: 'pharmacist', phone: '', password: '' });
-                      setSelectedUserId(null);
-                      setShowAddUserModal(true);
-                    }}
-                    className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>إضافة مستخدم جديد</span>
-                  </button>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1 sm:flex-initial sm:min-w-[420px]">
+                    {/* Search Bar */}
+                    <div className={`flex-1 relative flex items-center rounded-xl px-3 py-2 border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
+                      <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                      <input 
+                        type="text"
+                        placeholder="ابحث باسم المستخدم، البريد، الدور، الهاتف..."
+                        value={usersSearchQuery}
+                        onChange={(e) => setUsersSearchQuery(e.target.value)}
+                        className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                      />
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        setUserForm({ name: '', email: '', role: 'pharmacist', phone: '', password: '' });
+                        setSelectedUserId(null);
+                        setShowAddUserModal(true);
+                      }}
+                      className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>إضافة مستخدم جديد</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
@@ -4314,55 +5027,86 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/40">
-                        {users.map((u) => (
-                          <tr key={u.uid} className="hover:bg-slate-900/25 transition">
-                            <td className="py-3.5 font-bold text-slate-200">{u.name}</td>
-                            <td className="py-3.5 font-mono text-slate-300">{u.email}</td>
-                            <td className="py-3.5">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                u.role === 'admin' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 
-                                u.role === 'pharmacist' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 
-                                'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              }`}>
-                                {u.role === 'admin' ? 'مدير النظام' : u.role === 'pharmacist' ? 'صيدلي' : 'فني صيدلة'}
-                              </span>
-                            </td>
-                            <td className="py-3.5 font-mono text-slate-400">{u.phone || '-'}</td>
-                            <td className="py-3.5 font-mono text-slate-500">{u.password}</td>
-                            <td className="py-3.5 text-left">
-                              <div className="flex gap-2 justify-end">
-                                <button 
-                                  onClick={() => {
-                                    setSelectedUserId(u.uid);
-                                    setUserForm({
-                                      name: u.name,
-                                      email: u.email,
-                                      role: u.role,
-                                      phone: u.phone || '',
-                                      password: u.password
-                                    });
-                                    setShowEditUserModal(true);
-                                  }}
-                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg hover:text-white transition cursor-pointer"
-                                >
-                                  <Edit2 className="w-3.5 h-3.5" />
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    if (u.uid === currentUser.uid) {
-                                      showToast('عذراً، لا يمكنك حذف حسابك الشخصي الذي تستخدمه لتسجيل الدخول حالياً!', 'error');
-                                      return;
-                                    }
-                                    setDeleteConfirmTarget({ id: u.uid, name: u.name, type: 'user' });
-                                  }}
-                                  className="p-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition cursor-pointer"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                        {users.filter(u => {
+                          const query = usersSearchQuery.trim().toLowerCase();
+                          if (!query) return true;
+                          const roleLabel = u.role === 'admin' ? 'مدير النظام' : u.role === 'pharmacist' ? 'صيدلي' : 'فني صيدلة';
+                          return (
+                            (u.name || '').toLowerCase().includes(query) ||
+                            (u.email || '').toLowerCase().includes(query) ||
+                            (u.phone || '').toLowerCase().includes(query) ||
+                            roleLabel.toLowerCase().includes(query) ||
+                            (u.role || '').toLowerCase().includes(query)
+                          );
+                        }).length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="p-10 text-center text-slate-400">
+                              <HelpCircle className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                              <span>لا يوجد مستخدمون يطابقون خيارات البحث المحددة.</span>
                             </td>
                           </tr>
-                        ))}
+                        ) : (
+                          users.filter(u => {
+                            const query = usersSearchQuery.trim().toLowerCase();
+                            if (!query) return true;
+                            const roleLabel = u.role === 'admin' ? 'مدير النظام' : u.role === 'pharmacist' ? 'صيدلي' : 'فني صيدلة';
+                            return (
+                              (u.name || '').toLowerCase().includes(query) ||
+                              (u.email || '').toLowerCase().includes(query) ||
+                              (u.phone || '').toLowerCase().includes(query) ||
+                              roleLabel.toLowerCase().includes(query) ||
+                              (u.role || '').toLowerCase().includes(query)
+                            );
+                          }).map((u) => (
+                            <tr key={u.uid} className="hover:bg-slate-900/25 transition">
+                              <td className="py-3.5 font-bold text-slate-200">{u.name}</td>
+                              <td className="py-3.5 font-mono text-slate-300">{u.email}</td>
+                              <td className="py-3.5">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  u.role === 'admin' ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 
+                                  u.role === 'pharmacist' ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 
+                                  'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                }`}>
+                                  {u.role === 'admin' ? 'مدير النظام' : u.role === 'pharmacist' ? 'صيدلي' : 'فني صيدلة'}
+                                </span>
+                              </td>
+                              <td className="py-3.5 font-mono text-slate-400">{u.phone || '-'}</td>
+                              <td className="py-3.5 font-mono text-slate-500">{u.password}</td>
+                              <td className="py-3.5 text-left">
+                                <div className="flex gap-2 justify-end">
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedUserId(u.uid);
+                                      setUserForm({
+                                        name: u.name,
+                                        email: u.email,
+                                        role: u.role,
+                                        phone: u.phone || '',
+                                        password: u.password
+                                      });
+                                      setShowEditUserModal(true);
+                                    }}
+                                    className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg hover:text-white transition cursor-pointer"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button 
+                                    onClick={() => {
+                                      if (u.uid === currentUser.uid) {
+                                        showToast('عذراً، لا يمكنك حذف حسابك الشخصي الذي تستخدمه لتسجيل الدخول حالياً!', 'error');
+                                        return;
+                                      }
+                                      setDeleteConfirmTarget({ id: u.uid, name: u.name, type: 'user' });
+                                    }}
+                                    className="p-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -4936,7 +5680,7 @@ export default function App() {
                               <option value="">-- اختر الدواء المتوفر في المخزن --</option>
                               {medicines.map(m => (
                                 <option key={m.id} value={m.id}>
-                                  {m.commercialName} ({m.scientificName}) - متاح: {m.quantity} {m.unit}
+                                  {m.commercialName} ({m.scientificName}) {m.alternatives ? `[البدائل: ${m.alternatives}]` : ''} - متاح: {m.quantity} {m.unit}
                                 </option>
                               ))}
                             </select>
@@ -5100,9 +5844,14 @@ export default function App() {
                                     }`}
                                   >
                                     <div className="space-y-1 text-right flex-1 min-w-0">
-                                      <div className="flex items-center gap-1.5">
+                                      <div className="flex items-center gap-1.5 flex-wrap">
                                         <strong className={`font-bold ${dose.checkedToday ? 'text-emerald-400 line-through' : 'text-slate-200'}`}>{dose.medicineName}</strong>
                                         <span className="text-[10px] text-slate-500">({medicines.find(m => m.id === dose.medicineId)?.scientificName || "اسم علمي"})</span>
+                                        {medicines.find(m => m.id === dose.medicineId)?.alternatives && (
+                                          <span className="text-[10px] text-indigo-400 font-sans font-semibold bg-indigo-500/10 px-1.5 py-0.5 rounded-md">
+                                            البدائل: {medicines.find(m => m.id === dose.medicineId)?.alternatives}
+                                          </span>
+                                        )}
                                       </div>
                                       <p className="text-slate-400 text-[11px] font-semibold">{dose.dosage}</p>
                                       
@@ -5189,6 +5938,8 @@ export default function App() {
                       <span>هل أنت متأكد تماماً من شطب المقيم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من سجلات الصيدلية والمركز؟ هذا الإجراء سيؤثر على ربط سجلات الصرف القديمة.</span>
                     ) : deleteConfirmTarget.type === 'user' ? (
                       <span>هل أنت متأكد تماماً من إلغاء حساب المستخدم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> وحظر وصوله إلى نظام الصيدلية؟</span>
+                    ) : deleteConfirmTarget.type === 'company' ? (
+                      <span>هل أنت متأكد تماماً من شطب شركة الأدوية <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من دليل شركات التوريد والإنتاج؟</span>
                     ) : (
                       <span>هل أنت متأكد تماماً من حذف الملاحظة السلوكية والطبية المسجلة للمقيم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من نظام التتبع السلوكي؟</span>
                     )}
@@ -5212,6 +5963,11 @@ export default function App() {
                           const updated = users.filter(u => u.uid !== deleteConfirmTarget.id);
                           updateUsersList(updated);
                           showToast(`تم إلغاء حساب الكادر الطبي "${deleteConfirmTarget.name}" بنجاح.`, 'success');
+                        } else if (deleteConfirmTarget.type === 'company') {
+                          const updated = companies.filter(c => c.id !== deleteConfirmTarget.id);
+                          setCompanies(updated);
+                          localStorage.setItem('care_pharmacy_companies', JSON.stringify(updated));
+                          showToast(`تم حذف شركة "${deleteConfirmTarget.name}" بنجاح.`, 'success');
                         } else if (deleteConfirmTarget.type === 'behaviorLog') {
                           const updated = behaviorLogs.filter(b => b.id !== deleteConfirmTarget.id);
                           updateBehaviorLogs(updated);
@@ -5707,6 +6463,44 @@ export default function App() {
               </div>
             )}
 
+            {/* ----------------- MODAL: CONFIRM DELETE COMPANY ----------------- */}
+            {deleteConfirmCompanyId && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-slate-100" dir="rtl">
+                <div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
+                  <h3 className="text-lg font-bold text-rose-400 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    تأكيد حذف شركة الأدوية
+                  </h3>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    هل أنت متأكد تماماً من شطب شركة الأدوية <strong className="text-teal-400">{companies.find(c => c.id === deleteConfirmCompanyId)?.name}</strong> نهائياً من دليل شركات التوريد والإنتاج؟
+                  </p>
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button
+                      onClick={() => setDeleteConfirmCompanyId(null)}
+                      className="px-4 py-2 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
+                    >
+                      إلغاء الأمر
+                    </button>
+                    <button
+                      onClick={() => {
+                        const targetCompany = companies.find(c => c.id === deleteConfirmCompanyId);
+                        if (targetCompany) {
+                          const updated = companies.filter(c => c.id !== deleteConfirmCompanyId);
+                          setCompanies(updated);
+                          localStorage.setItem('care_pharmacy_companies', JSON.stringify(updated));
+                          showToast(`تم حذف شركة "${targetCompany.name}" بنجاح.`, 'success');
+                        }
+                        setDeleteConfirmCompanyId(null);
+                      }}
+                      className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer"
+                    >
+                      تأكيد الحذف والشطب
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ----------------- MODAL: ADD MEDICINE ----------------- */}
             {showAddMedModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-slate-100" dir="rtl">
@@ -5869,6 +6663,88 @@ export default function App() {
                             ))}
                           </select>
                         )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-slate-400 mb-1">الشركة المصنعة للدواء</label>
+                        <input 
+                          type="text"
+                          list="company-list"
+                          value={medForm.manufacturer}
+                          onChange={(e) => setMedForm(prev => ({ ...prev, manufacturer: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                          placeholder="اكتب اسم الشركة أو اختر من القائمة..."
+                        />
+                        <datalist id="company-list">
+                          {companies.map(c => (
+                            <option key={c.id} value={c.name} />
+                          ))}
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 mb-1">البدائل المتاحة لهذا الدواء</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            value={tempAlternative}
+                            onChange={(e) => setTempAlternative(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const val = tempAlternative.trim();
+                                if (val) {
+                                  const arr = getAlternativesArray(medForm.alternatives);
+                                  if (!arr.includes(val)) {
+                                    setMedForm(prev => ({ ...prev, alternatives: [...arr, val].join('، ') }));
+                                  }
+                                  setTempAlternative('');
+                                }
+                              }
+                            }}
+                            className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-right text-xs"
+                            placeholder="اكتب اسم البديل ثم اضغط Enter أو زر الإضافة..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = tempAlternative.trim();
+                              if (val) {
+                                const arr = getAlternativesArray(medForm.alternatives);
+                                if (!arr.includes(val)) {
+                                  setMedForm(prev => ({ ...prev, alternatives: [...arr, val].join('، ') }));
+                                }
+                                setTempAlternative('');
+                              }
+                            }}
+                            className="px-3 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+                          >
+                            إضافة بديل +
+                          </button>
+                        </div>
+                        {/* Display badges */}
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-h-24 overflow-y-auto">
+                          {getAlternativesArray(medForm.alternatives).map((alt, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-950/80 text-teal-400 rounded-lg text-[11px] font-bold border border-slate-800">
+                              <span>{alt}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const arr = getAlternativesArray(medForm.alternatives).filter((_, i) => i !== idx);
+                                  setMedForm(prev => ({ ...prev, alternatives: arr.join('، ') }));
+                                }}
+                                className="text-slate-500 hover:text-rose-400 transition text-sm font-black"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                          {getAlternativesArray(medForm.alternatives).length === 0 && (
+                            <span className="text-[10px] text-slate-500">لم يتم تسجيل أي بدائل لهذا الدواء بعد.</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -6046,6 +6922,88 @@ export default function App() {
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-slate-400 mb-1">الشركة المصنعة للدواء</label>
+                        <input 
+                          type="text"
+                          list="company-list"
+                          value={medForm.manufacturer}
+                          onChange={(e) => setMedForm(prev => ({ ...prev, manufacturer: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                          placeholder="اكتب اسم الشركة أو اختر من القائمة..."
+                        />
+                        <datalist id="company-list">
+                          {companies.map(c => (
+                            <option key={c.id} value={c.name} />
+                          ))}
+                        </datalist>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 mb-1">البدائل المتاحة لهذا الدواء</label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text"
+                            value={tempAlternative}
+                            onChange={(e) => setTempAlternative(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const val = tempAlternative.trim();
+                                if (val) {
+                                  const arr = getAlternativesArray(medForm.alternatives);
+                                  if (!arr.includes(val)) {
+                                    setMedForm(prev => ({ ...prev, alternatives: [...arr, val].join('، ') }));
+                                  }
+                                  setTempAlternative('');
+                                }
+                              }
+                            }}
+                            className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-right text-xs"
+                            placeholder="اكتب اسم البديل ثم اضغط Enter أو زر الإضافة..."
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const val = tempAlternative.trim();
+                              if (val) {
+                                const arr = getAlternativesArray(medForm.alternatives);
+                                if (!arr.includes(val)) {
+                                  setMedForm(prev => ({ ...prev, alternatives: [...arr, val].join('، ') }));
+                                }
+                                setTempAlternative('');
+                              }
+                            }}
+                            className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+                          >
+                            إضافة بديل +
+                          </button>
+                        </div>
+                        {/* Display badges */}
+                        <div className="flex flex-wrap gap-1.5 mt-2 max-h-24 overflow-y-auto">
+                          {getAlternativesArray(medForm.alternatives).map((alt, idx) => (
+                            <span key={idx} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-950/80 text-teal-400 rounded-lg text-[11px] font-bold border border-slate-800">
+                              <span>{alt}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const arr = getAlternativesArray(medForm.alternatives).filter((_, i) => i !== idx);
+                                  setMedForm(prev => ({ ...prev, alternatives: arr.join('، ') }));
+                                }}
+                                className="text-slate-500 hover:text-rose-400 transition text-sm font-black"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))}
+                          {getAlternativesArray(medForm.alternatives).length === 0 && (
+                            <span className="text-[10px] text-slate-500">لم يتم تسجيل أي بدائل لهذا الدواء بعد.</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
                     <button
                       type="submit"
                       className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4"
@@ -6085,7 +7043,7 @@ export default function App() {
                         <option value="">-- اضغط لتحديد الدواء --</option>
                         {medicines.filter(m => m.quantity > 0).map(m => (
                           <option key={m.id} value={m.id}>
-                            {m.commercialName} ({m.scientificName}) - متوفر: {m.quantity} {m.unit} | انتهاء: {m.expiryDate}
+                            {m.commercialName} ({m.scientificName}) {m.alternatives ? `[البدائل: ${m.alternatives}]` : ''} - متوفر: {m.quantity} {m.unit} | انتهاء: {m.expiryDate}
                           </option>
                         ))}
                       </select>
@@ -6152,6 +7110,107 @@ export default function App() {
                       className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-indigo-900/20"
                     >
                       إتمام وتوثيق عملية الصرف الطبي
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {/* ----------------- MODAL: ADD/EDIT PHARMACEUTICAL COMPANY ----------------- */}
+            {showCompanyModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-slate-100" dir="rtl">
+                <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative animate-fade-in">
+                  <button 
+                    onClick={() => {
+                      setShowCompanyModal(false);
+                      setSelectedCompanyId(null);
+                    }}
+                    className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  
+                  <h3 className="text-lg font-bold text-teal-400 mb-4 flex items-center gap-2">
+                    <Plus className="w-5 h-5" />
+                    <span>{selectedCompanyId ? 'تعديل بيانات شركة الأدوية' : 'إضافة شركة أدوية جديدة'}</span>
+                  </h3>
+
+                  <form onSubmit={handleAddOrEditCompany} className="space-y-4 text-xs text-slate-300">
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-bold">اسم الشركة المصنعة *</label>
+                      <input 
+                        type="text"
+                        required
+                        value={companyForm.name}
+                        onChange={(e) => setCompanyForm(prev => ({ ...prev, name: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                        placeholder="مثال: الشركة السعودية للصناعات الدوائية (سبيماكو)"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-slate-400 mb-1">بلد التصنيع / المنشأ</label>
+                        <input 
+                          type="text"
+                          value={companyForm.country}
+                          onChange={(e) => setCompanyForm(prev => ({ ...prev, country: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                          placeholder="مثال: المملكة العربية السعودية"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 mb-1">مسؤول التواصل العلمي/المبيعات</label>
+                        <input 
+                          type="text"
+                          value={companyForm.contactPerson}
+                          onChange={(e) => setCompanyForm(prev => ({ ...prev, contactPerson: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                          placeholder="مثال: أ. أحمد القحطاني"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-slate-400 mb-1">رقم الهاتف / الاتصال</label>
+                        <input 
+                          type="text"
+                          value={companyForm.phone}
+                          onChange={(e) => setCompanyForm(prev => ({ ...prev, phone: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                          placeholder="مثال: +96611234567"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 mb-1">البريد الإلكتروني المهني</label>
+                        <input 
+                          type="email"
+                          value={companyForm.email}
+                          onChange={(e) => setCompanyForm(prev => ({ ...prev, email: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                          placeholder="example@spimaco.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-400 mb-1">ملاحظات تزويد الدواء ووكلاء التوزيع</label>
+                      <textarea 
+                        value={companyForm.notes}
+                        onChange={(e) => setCompanyForm(prev => ({ ...prev, notes: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none h-20 resize-none"
+                        placeholder="اكتب أي معلومات تزويد خاصة بالشركة..."
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-teal-900/20 cursor-pointer"
+                    >
+                      {selectedCompanyId ? 'تحديث بيانات الشركة' : 'إضافة الشركة الجديدة وحفظها'}
                     </button>
                   </form>
                 </div>
