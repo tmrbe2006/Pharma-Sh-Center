@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Fix window.fetch read-only property issue in iframe/preview environments -->
+    <script>
+      (function() {
+        try {
+          var _fetch = window.fetch;
+          Object.defineProperty(window, 'fetch', {
+            get: function() {
+              return _fetch;
+            },
+            set: function(val) {
+              _fetch = val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          try {
+            var _fetch2 = window.fetch;
+            Object.defineProperty(Window.prototype, 'fetch', {
+              get: function() {
+                return _fetch2;
+              },
+              set: function(val) {
+                _fetch2 = val;
+              },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e2) {
+            console.warn("Unable to patch window.fetch:", e2);
+          }
+        }
+
+        // Suppress and silence Vite HMR / WebSocket connection warning/error logs in preview sandboxes
+        try {
+          var originalError = console.error;
+          console.error = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var isViteError = args.some(function(arg) {
+              if (!arg) return false;
+              var str = '';
+              if (typeof arg === 'string') {
+                str = arg;
+              } else if (arg instanceof Error) {
+                str = (arg.message || '') + ' ' + (arg.stack || '');
+              } else {
+                try {
+                  str = JSON.stringify(arg);
+                } catch (e) {
+                  str = String(arg);
+                }
+              }
+              return str.indexOf('[vite]') !== -1 || str.indexOf('WebSocket') !== -1 || str.indexOf('hmr') !== -1 || str.indexOf('ws://') !== -1 || str.indexOf('vite-client') !== -1;
+            });
+            if (isViteError) {
+              return;
+            }
+            originalError.apply(console, arguments);
+          };
+
+          var originalWarn = console.warn;
+          console.warn = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var isViteError = args.some(function(arg) {
+              if (!arg) return false;
+              var str = '';
+              if (typeof arg === 'string') {
+                str = arg;
+              } else if (arg instanceof Error) {
+                str = (arg.message || '') + ' ' + (arg.stack || '');
+              } else {
+                try {
+                  str = JSON.stringify(arg);
+                } catch (e) {
+                  str = String(arg);
+                }
+              }
+              return str.indexOf('[vite]') !== -1 || str.indexOf('WebSocket') !== -1 || str.indexOf('hmr') !== -1 || str.indexOf('ws://') !== -1 || str.indexOf('vite-client') !== -1;
+            });
+            if (isViteError) {
+              return;
+            }
+            originalWarn.apply(console, arguments);
+          };
+
+          // Capture and prevent global WebSocket connection error propagation
+          window.addEventListener('error', function(e) {
+            if (e) {
+              var msg = e.message || '';
+              var src = (e.target && e.target.src) || '';
+              var isVite = msg.indexOf('vite') !== -1 || msg.indexOf('WebSocket') !== -1 || src.indexOf('vite') !== -1;
+              if (isVite) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }
+          }, true);
+
+          window.addEventListener('unhandledrejection', function(e) {
+            if (e && e.reason) {
+              var msg = e.reason.message || '';
+              var stack = e.reason.stack || '';
+              var isVite = msg.indexOf('vite') !== -1 || msg.indexOf('WebSocket') !== -1 || stack.indexOf('vite') !== -1;
+              if (isVite) {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }
+          }, true);
+        } catch (err) {
+          // Fallback silently if any error occurs during log hijacking
+        }
+      })();
+    </script>
+    
+    <!-- Title and SEO Metadata matching metadata.json -->
+    <title>نظام إدارة صيدلية مركز الرعاية</title>
+    <meta name="description" content="نظام متطور لإدارة مخزن وصرف الأدوية لمركز ذوي الإعاقة مع لوحة تحكم ذكية مدعومة بالذكاء الاصطناعي وتطبيق PWA متكامل" />
+    
+    <!-- OpenGraph Social Media Cards -->
+    <meta property="og:title" content="نظام إدارة صيدلية مركز الرعاية" />
+    <meta property="og:description" content="نظام متطور لإدارة مخزن وصرف الأدوية لمركز ذوي الإعاقة مع لوحة تحكم ذكية مدعومة بالذكاء الاصطناعي وتطبيق PWA متكامل" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    
+    <!-- Apple Touch Icon for PWA iOS support -->
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    
+    <!-- Premium Arabic Font (Cairo) from Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;500;600;700;800;900;1000&display=swap" rel="stylesheet">
+    
+    <style>
+      body {
+        font-family: 'Cairo', sans-serif;
+      }
+      
+      /* Print View Layout overrides */
+      @media print {
+        body {
+          background-color: white !important;
+          color: black !important;
+        }
+        main, header, footer, button, select, input, nav, .print\:hidden {
+          display: none !important;
+        }
+        #print-area {
+          display: block !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

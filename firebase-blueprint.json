@@ -1,0 +1,276 @@
+{
+  "entities": {
+    "Medicine": {
+      "title": "Medicine",
+      "description": "بيانات الدواء في مخزن الصيدلية لمركز رعاية ذوي الإعاقة",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "معرف فريد للدواء"
+        },
+        "commercialName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "الاسم التجاري للدواء"
+        },
+        "scientificName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "الاسم العلمي للدواء"
+        },
+        "quantity": {
+          "type": "integer",
+          "description": "الكمية المتاحة في المخزن"
+        },
+        "expiryDate": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "تاريخ انتهاء صلاحية الدواء بتنسيق YYYY-MM-DD"
+        },
+        "price": {
+          "type": "number",
+          "description": "سعر وحدة الصنف"
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["علبة", "شريط", "حبة"],
+          "description": "وحدة قياس الصنف"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 50,
+          "description": "فئة الدواء العلاجية"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "وقت إضافة الدواء"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "وقت تحديث الدواء"
+        }
+      },
+      "required": ["commercialName", "scientificName", "quantity", "expiryDate", "price", "unit"]
+    },
+    "DispenseRecord": {
+      "title": "DispenseRecord",
+      "description": "سجلات صرف الأدوية للمرضى المقيمين في مركز ذوي الإعاقة",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "معرف سجل الصرف"
+        },
+        "medicineId": {
+          "type": "string",
+          "description": "معرف الدواء المصروف"
+        },
+        "medicineName": {
+          "type": "string",
+          "description": "الاسم التجاري للدواء وقت الصرف"
+        },
+        "residentName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "اسم المقيم المستفيد في مركز ذوي الإعاقة"
+        },
+        "quantityDispensed": {
+          "type": "integer",
+          "description": "الكمية المقررة للصرف"
+        },
+        "unit": {
+          "type": "string",
+          "description": "الوحدة المستخدمة في الصرف"
+        },
+        "totalPrice": {
+          "type": "number",
+          "description": "إجمالي سعر الكمية المصروفة"
+        },
+        "actualQuantityDispensed": {
+          "type": "integer",
+          "description": "الكمية المصروفة فعلياً للمراجعة والتدقيق"
+        },
+        "dispensedBy": {
+          "type": "string",
+          "description": "اسم الصيدلي أو الفني المسؤول عن عملية الصرف"
+        },
+        "dispensedById": {
+          "type": "string",
+          "description": "معرف المستخدم الذي أتم عملية الصرف"
+        },
+        "dispensedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "تاريخ ووقت إتمام عملية الصرف"
+        }
+      },
+      "required": ["medicineId", "medicineName", "residentName", "quantityDispensed", "unit", "totalPrice", "actualQuantityDispensed", "dispensedBy", "dispensedById", "dispensedAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "ملفات المستخدمين والصلاحيات للنظام",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "معرف المستخدم في Firebase Auth"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "الاسم الكامل للمستخدم"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "البريد الإلكتروني المهني للمستخدم"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "pharmacist", "technician"],
+          "description": "الدور الوظيفي للمستخدم للتحكم في الصلاحيات"
+        },
+        "allowedScreens": {
+          "type": "array",
+          "description": "الشاشات المسموح بها للمستخدم حسب دوره"
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^\\+?[1-9]\\d{1,14}$",
+          "description": "رقم الهاتف المسجل للتنبيهات والواتساب الدولي"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "تاريخ إنشاء الحساب"
+        }
+      },
+      "required": ["uid", "name", "email", "role", "allowedScreens"]
+    },
+    "UserSession": {
+      "title": "UserSession",
+      "description": "سجل تتبع جلسات الدخول وحماية البيانات وأمان الاستخدام",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "معرف فريد للجلسة"
+        },
+        "userId": {
+          "type": "string",
+          "description": "معرف المستخدم المستعرض"
+        },
+        "name": {
+          "type": "string",
+          "description": "اسم المستخدم في هذه الجلسة"
+        },
+        "email": {
+          "type": "string",
+          "description": "البريد الإلكتروني للمستخدم"
+        },
+        "ipAddress": {
+          "type": "string",
+          "description": "عنوان IP Address الذي تم منه الدخول"
+        },
+        "deviceToken": {
+          "type": "string",
+          "description": "Device Token الفريد للمستعرض للتنبيهات"
+        },
+        "loginTime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "توقيت الدخول وحفظ الجلسة"
+        }
+      },
+      "required": ["userId", "name", "email", "ipAddress", "deviceToken", "loginTime"]
+    },
+    "StockAuditLog": {
+      "title": "StockAuditLog",
+      "description": "سجلات التدقيق والمراقبة التاريخية لحركات المخزون وصرف الأدوية من الصيدلية",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "معرف سجل التدقيق"
+        },
+        "medicineId": {
+          "type": "string",
+          "description": "معرف الدواء المعني"
+        },
+        "medicineName": {
+          "type": "string",
+          "description": "الاسم التجاري والعلمي للدواء"
+        },
+        "actionType": {
+          "type": "string",
+          "enum": ["إضافة دواء جديد", "تحديث كمية", "تعديل يدوي", "حذف دواء", "صرف دواء لمقيم"],
+          "description": "نوع الحركة المخزنية"
+        },
+        "quantityChanged": {
+          "type": "integer",
+          "description": "فرق الكمية (+ أو -)"
+        },
+        "previousQuantity": {
+          "type": "integer",
+          "description": "الكمية قبل الحركة"
+        },
+        "newQuantity": {
+          "type": "integer",
+          "description": "الكمية بعد الحركة"
+        },
+        "performedByName": {
+          "type": "string",
+          "description": "اسم الشخص الذي أجرى التعديل"
+        },
+        "performedByEmail": {
+          "type": "string",
+          "description": "البريد الإلكتروني للفاعل"
+        },
+        "performedById": {
+          "type": "string",
+          "description": "معرف المستخدم للفاعل"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "سبب الحركة أو ملاحظات التدقيق"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "توقيت وقوع الحركة بدقة"
+        }
+      },
+      "required": ["medicineId", "medicineName", "actionType", "quantityChanged", "previousQuantity", "newQuantity", "performedByName", "performedByEmail", "performedById", "notes", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/medicines/{medicineId}": {
+      "schema": "Medicine",
+      "description": "مجموعة الأدوية المتوفرة في المخزن"
+    },
+    "/dispense_records/{recordId}": {
+      "schema": "DispenseRecord",
+      "description": "مجموعة سجلات الصرف للمقيمين بالمركز"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "مجموعة المستخدمين والملفات الشخصية والأدوار"
+    },
+    "/user_sessions/{sessionId}": {
+      "schema": "UserSession",
+      "description": "جلسات الدخول وتتبع الأمان للمستخدمين والأجهزة"
+    },
+    "/stock_audit_logs/{logId}": {
+      "schema": "StockAuditLog",
+      "description": "سجلات التدقيق والمراقبة التاريخية لمنع الهدر والسرقة"
+    }
+  }
+}
