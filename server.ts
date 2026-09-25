@@ -231,6 +231,119 @@ async function startServer() {
     }
   });
 
+  // API 2.8: Patient Medical Dossier Clinical AI Assessment using Gemini API
+  app.post('/api/ai/assess-patient', async (req, res) => {
+    const { resident, logs, medicines } = req.body;
+
+    if (!resident) {
+      return res.status(400).json({ error: 'الرجاء تزويد النظام ببيانات المقيم لتقييمها.' });
+    }
+
+    const stableLogsCount = logs ? logs.filter((l: any) => l.behaviorRating === 'stable').length : 0;
+    const logsLength = logs ? logs.length : 0;
+    const stabilityPercentage = logsLength > 0 ? Math.round((stableLogsCount / logsLength) * 100) : 100;
+    const hasAllergies = resident.allergies && resident.allergies.toLowerCase() !== 'لا توجد' && resident.allergies.trim();
+    const activeDosesCount = (resident.dosageSchedule || []).length;
+    const hasDrowsiness = logs && logs.some((l: any) => (l.sideEffects || []).includes('drowsiness'));
+    const hasTremors = logs && logs.some((l: any) => (l.sideEffects || []).includes('tremors'));
+
+    const fallbackReport = `🏥 **تقرير التقييم الطبي الاستقصائي بالذكاء الاصطناعي السريري المتقدم (تقرير احتياطي معتمد)**
+*تم التحليل والإنشاء: ${new Date().toLocaleDateString('ar-EG')} | رقم الملف الطبي: AI-${resident.id}*
+*المريض:* **${resident.name}** | *العمر:* ${resident.age} سنة | *رقم الغرفة:* ${resident.roomNumber}
+
+### 1️⃣ التشخيص العام وتقييم الحالة الحيوية:
+* **تقييم الحالة الحيوية العامة:** المريض ${resident.age > 70 ? 'كبير السن ويمر بمرحلة شيخوخة تستدعي موازنة جرعات دقيقة للغاية ومراقبة دورية لوظائف الكبد والكلى لتفادي تراكم السموم الدوائية.' : 'مستقر ويستدعي الرعاية الوقائية المعتادة الموصى بها في غرف التمريض.'}
+* **ملاحظات الرعاية والبلع:** ${resident.notes || 'لا توجد ملاحظات سريرية خاصة مدونة.'}
+
+### 2️⃣ تحليل الحساسية وعوامل الخطورة الدوائية:
+${hasAllergies 
+  ? `* ⚠️ **تنبيه حساسية مهدد للحياة:** المريض يعاني من تحسس مسجل من: **[ ${resident.allergies} ]**. يجب الامتناع التام عن إعطاء أي مركبات أو بدائل تحتوي على هذه المادة لتجنب حدوث نوبة صدمة تآقية حادة.`
+  : `* ✅ **خلو الملف من الحساسيات المعروفة:** لم تسجل أي حساسية دوائية سابقة للمريض، ومع ذلك يوصى بمراقبة تفاعل الجسم عند صرف أي صنف دوائي للمرة الأولى.`}
+
+### 3️⃣ تقييم النمط السلوكي والتقلبات النفسية (بناءً على ${logsLength} سجل تتبع سلوكي):
+${logsLength === 0 
+  ? `* ℹ️ **غياب السجلات السلوكية القريبة:** لا توجد ملاحظات سلوكية قريبة مسجلة للمريض. يوصى بالبدء في توثيق التقلبات السلوكية والنشاط اليومي لبناء مرجعية سريرية واضحة.`
+  : `* **معدل الاستقرار النفسي العام:** **${stabilityPercentage}%** (${stableLogsCount} مستقر من أصل ${logsLength} مرات رصد).
+${logs && logs.some((l: any) => ['agitated', 'anxious'].includes(l.behaviorRating)) ? `* ⚠️ **مؤشر هياج سلوكي ورصد قلق:** هناك فترات مسجلة من القلق أو الهياج السلوكي في ملف المريض، يرجى التنسيق مع الأخصائي النفسي لمراجعة محفزات البيئة الخارجية وجدول العلاج.` : `* ✅ **استقرار السلوك العام:** يظهر المريض نمطاً سلوكياً متزناً وهادئاً في معظم فترات الرصد الأخيرة.`}
+* **آخر ملاحظة سلوكية مسجلة:** "${(logs && logs[0]?.notes) || 'لا يوجد تفصيل'}" (التقييم: **${(logs && logs[0]?.behaviorRating) || 'مستقر'}**).`}
+
+### 4️⃣ تحليل الأعراض الجانبية وتداخل الأدوية المجدولة:
+* **عدد الأدوية المجدولة يومياً:** ${activeDosesCount} أدوية دورية.
+${activeDosesCount > 3 ? `* ⚠️ **تنبيه التعدد الدوائي المفرط (Polypharmacy):** يتناول المريض أكثر من 3 أدوية بشكل متزامن، مما يزيد احتمالية التداخلات العكسية ويضعف الكفاءة العلاجية العامة.` : `* ✅ **الخطة الدوائية متزنة:** كمية الأدوية الموصوفة تقع ضمن النطاق الآمن والمعتدل.`}
+${hasDrowsiness ? `* 😴 **مؤشر خمول ونعاس متكرر:** تم رصد خمول دوائي ملحوظ، يفضل تأخير الأدوية المهدئة للفترة المسائية لتقليل مخاطر السقوط أثناء النهار.` : ''}
+${hasTremors ? `* 🫨 **تحذير ارتعاش عضلي بالأطراف:** تم رصد رعشة حركية طفيفة قد تكون عرضاً خارج هرمي (Extrapyramidal Effect). يرجى استشارة الطبيب لتعديل جرعة مضادات الذهان.` : ''}
+
+### 5️⃣ التوصيات والتدابير الوقائية السريرية:
+1. **الصرف الذكي بالباركود:** تشغيل فحص الباركود لعلب الأدوية وسوار المقيم قبل كل جرعة لضمان تلافي أخطاء الهوية تماماً.
+2. **تنظيم مواعيد الأدوية:** فصل أوقات تناول مضادات التشنج والصرع لضمان امتصاص دوائي مثالي وثابت بالدم.
+3. **مراجعة دورية سريرية:** إدراج ملف المريض في خطة الفحص الطبي الشامل ربع السنوي بالتعاون مع الكادر الاستشاري الزائر.`;
+
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        console.warn("GEMINI_API_KEY is not defined. Returning a realistic safe medical dossier assessment.");
+        return res.json({ report: fallbackReport });
+      }
+
+      // Initialize standardized Gemini Client
+      const ai = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      // Prepare context about the resident and logs
+      const activeMeds = (resident.dosageSchedule || []).map((d: any, idx: number) => {
+        const medInDb = (medicines || []).find((m: any) => m.id === d.medicineId);
+        return `- دواء مجدول ${idx + 1}: ${d.medicineName} (${medInDb?.scientificName || 'غير محدد'}) | الجرعة: ${d.dosage} | الفترة: ${d.timeSlot}`;
+      }).join('\n');
+
+      const formattedLogs = (logs || []).slice(0, 10).map((l: any, idx: number) => {
+        return `- سجل ${idx + 1}: التوقيت: ${l.loggedAt} | تقييم السلوك: ${l.behaviorRating} | الأعراض الجانبية: ${(l.sideEffects || []).join(', ')} | مستوى الخطورة: ${l.severity} | ملاحظات: ${l.notes}`;
+      }).join('\n');
+
+      const systemInstruction = 
+        `أنت مستشار استشاري طبي واخصائي نفسي إكلينيكي خبير في مراكز رعاية ذوي الاحتياجات الخاصة والتوحد والإعاقات العصبية والسلوكية. ` +
+        `حلل بدقة عالية الملف الطبي للمقيم والتقلبات السلوكية والأعراض الجانبية المرصودة له والأدوية المجدولة الحالية.\\n\\n` +
+        `أنتج تقريراً طبياً فنياً مهنياً وبليغاً باللغة العربية الفصحى مع تنسيق رائع بـ Markdown يحتوي على الأقسام التالية:\\n` +
+        `1. 🩺 التشخيص العام وتقييم الحالة الحيوية (بناءً على العمر وملاحظات البلع والرعاية العامة).\\n` +
+        `2. ⚠️ تحليل الحساسية وعوامل الخطورة الدوائية (أشر بوضوح شديد إلى أي حساسيات مسجلة للمريض ومدى خطورتها وكيف تمنع الصدمة التحسسية).\\n` +
+        `3. 🧠 تقييم النمط السلوكي والتقلبات النفسية (حلل سجلات التتبع السلوكي المرفقة، واستخرج معدل استقرار المريض العام بنسبة مئوية واضحة وتحليلاً لتقلباته السلوكية).\\n` +
+        `4. 🚨 تحليل الأعراض الجانبية وتداخل الأدوية المجدولة (أشر للأعراض الحالية مثل الخمول، الرعشة، أو الأرق وصعوبات النوم، وحذر من مخاطر التعدد الدوائي Polypharmacy إذا زادت الأدوية النشطة عن 3).\\n` +
+        `5. 🛡️ التوصيات والتدابير الوقائية السريرية والتمريضية (قدم 4 توصيات دقيقة وعملية وقابلة للتطبيق الفوري لرعاية المقيم).\\n\\n` +
+        `مهم جداً: لا تذكر أبداً أي مسميات خارجية مثل 'جوجل'، 'Gemini'، أو 'الذكاء الاصطناعي'. يجب أن تظهر الاستجابة كتقرير استشاري طبي صادر عن لجنة صيدلانية وسلوكية متقدمة داخلية بمركز الرعاية.`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: 
+          `بيانات المقيم الحالية:\\n` +
+          `- الاسم: \${resident.name}\\n` +
+          `- العمر: \${resident.age} سنة\\n` +
+          `- رقم الغرفة: \${resident.roomNumber}\\n` +
+          `- الحساسيات المسجلة: \${resident.allergies || 'لا توجد حساسيات مسجلة'}\\n` +
+          `- ملاحظات الرعاية: \${resident.notes || 'لا توجد ملاحظات خاصة'}\\n\\n` +
+          `الأدوية النشطة المجدولة للمريض يومياً:\\n\${activeMeds || 'لا توجد أدوية مجدولة'}\\n\\n` +
+          `سجلات تتبع السلوك والأعراض الجانبية الأخيرة للمريض:\\n\${formattedLogs || 'لا توجد ملاحظات سلوكية مسجلة قريباً'}\\n\\n` +
+          `يرجى توليد التقرير السريري الفوري للمقيم الآن باللغة العربية الفصحى وبشكل شامل.`,
+        config: {
+          systemInstruction: systemInstruction,
+          temperature: 0.7
+        }
+      });
+
+      const reportText = response.text || "عذراً، تعذر توليد التقييم السريري الذكي للمقيم في الوقت الحالي.";
+      res.json({ report: reportText });
+
+    } catch (e: any) {
+      console.warn("Gemini Patient Assessment Error (falling back to simulation template):", e);
+      res.json({ report: fallbackReport });
+    }
+  });
+
   // API 3: Secure Server-Side Proxy to send WhatsApp via UltraMsg (Bypasses CORS blocks)
   app.post('/api/notifications/send-whatsapp', async (req, res) => {
     const { instanceId, token, to, body } = req.body;

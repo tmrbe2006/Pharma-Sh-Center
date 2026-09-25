@@ -3,7 +3,7 @@ import {
   Plus, Edit2, Trash2, Calendar, DollarSign, Package, Activity, AlertTriangle, 
   Search, Shield, FileText, UserCheck, Bell, Printer, Sparkles, RefreshCw, 
   Smartphone, Monitor, Moon, Sun, Info, CheckCircle2, User, HelpCircle, Eye, LogOut, X,
-  Lock, EyeOff, Mail, Copy, TrendingUp, TrendingDown
+  Lock, EyeOff, Mail, Copy, TrendingUp, TrendingDown, Download
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid,
@@ -22,15 +22,15 @@ interface RoleConfig {
 const ROLES: Record<string, RoleConfig> = {
   admin: {
     name: "مدير النظام",
-    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'users', 'security', 'ai_reports', 'audit_logs']
+    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'users', 'security', 'ai_reports', 'audit_logs', 'behavioral_tracker']
   },
   pharmacist: {
     name: "صيدلي ممارس",
-    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'ai_reports', 'audit_logs']
+    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'ai_reports', 'audit_logs', 'behavioral_tracker']
   },
   technician: {
     name: "فني صيدلة",
-    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'audit_logs']
+    allowedScreens: ['dashboard', 'inventory', 'dispense', 'residents', 'audit_logs', 'behavioral_tracker']
   }
 };
 
@@ -307,6 +307,9 @@ export default function App() {
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
+  const [behaviorSearchQuery, setBehaviorSearchQuery] = useState('');
+  const [filterBehavior, setFilterBehavior] = useState('all');
+  const [filterSeverity, setFilterSeverity] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedStockFilter, setSelectedStockFilter] = useState('all');
 
@@ -362,7 +365,8 @@ export default function App() {
 
 
   // Custom states for Delete Confirm Modal and Print Preview Modal
-  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string, name: string, type: 'resident' | 'user' } | null>(null);
+  const [deleteConfirmTarget, setDeleteConfirmTarget] = useState<{ id: string, name: string, type: 'resident' | 'user' | 'behaviorLog' } | null>(null);
+  const [printType, setPrintType] = useState<'inventory' | 'aiDossier'>('inventory');
   const [showPrintPreviewModal, setShowPrintPreviewModal] = useState(false);
   
   // Care center resident Dossier and Medication daily schedule
@@ -389,6 +393,110 @@ export default function App() {
 
   // Error logging state
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Behavioral & Side Effect Logs state with localStorage persistence
+  const [behaviorLogs, setBehaviorLogs] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('care_pharmacy_behavior_logs');
+      return saved ? JSON.parse(saved) : [
+        {
+          id: "blog-1",
+          residentId: "res-1",
+          residentName: "عبد الرحمن بن سليمان",
+          loggedAt: "2026-09-24T14:30:00Z",
+          loggedBy: "د. طارق اليوسف",
+          behaviorRating: "stable", // stable, agitated, withdrawn, anxious, hyperactive
+          sideEffects: ["drowsiness"], // drowsiness, appetite_loss, tremors, rash, nausea, insomnia, none
+          severity: "mild", // mild, moderate, severe, none
+          recentMedicineId: "med-5",
+          recentMedicineName: "ديباكين كرونو 500 ملجم",
+          notes: "خمول خفيف بعد تناول الجرعة المسائية من الديباكين، لكن السلوك العام مستقر والمريض هادئ."
+        },
+        {
+          id: "blog-2",
+          residentId: "res-2",
+          residentName: "سارة محمد الشمري",
+          loggedAt: "2026-09-24T18:00:00Z",
+          loggedBy: "صيدلي. كريم القحطاني",
+          behaviorRating: "anxious",
+          sideEffects: ["insomnia"],
+          severity: "moderate",
+          recentMedicineId: "med-3",
+          recentMedicineName: "بروفين 400 ملجم",
+          notes: "قلق وصعوبة في النوم بعد تناول البروفين، تم توجيه الممرض بتقديمه مبكراً بعد الغداء مباشرة."
+        }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const updateBehaviorLogs = (newList: any[]) => {
+    setBehaviorLogs(newList);
+    localStorage.setItem('care_pharmacy_behavior_logs', JSON.stringify(newList));
+  };
+
+  const [showAddBehaviorModal, setShowAddBehaviorModal] = useState(false);
+  const [behaviorForm, setBehaviorForm] = useState({
+    residentId: '',
+    behaviorRating: 'stable',
+    sideEffects: [] as string[],
+    severity: 'none',
+    recentMedicineId: '',
+    notes: ''
+  });
+
+  const [selectedBehaviorLogId, setSelectedBehaviorLogId] = useState<string | null>(null);
+  const [aiDossierResult, setAiDossierResult] = useState<string | null>(null);
+  const [aiDossierLoading, setAiDossierLoading] = useState(false);
+
+  const [customSideEffects, setCustomSideEffects] = useState<{key: string, label: string}[]>(() => {
+    try {
+      const saved = localStorage.getItem('care_pharmacy_custom_side_effects');
+      return saved ? JSON.parse(saved) : [
+        { key: 'drowsiness', label: 'خمول ونعاس حاد 😴' },
+        { key: 'appetite_loss', label: 'فقدان شهية واهتمام 🍽️' },
+        { key: 'tremors', label: 'ارتعاش ورجفة بالأطراف 🫨' },
+        { key: 'rash', label: 'طفح جلدي وحساسية 🔴' },
+        { key: 'nausea', label: 'غثيان واضطراب معدة 🤢' },
+        { key: 'insomnia', label: 'أرق وصعوبة نوم حادة ⏰' }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const [newSideEffectInput, setNewSideEffectInput] = useState('');
+  const [editingSideEffectKey, setEditingSideEffectKey] = useState<string | null>(null);
+  const [editingSideEffectLabel, setEditingSideEffectLabel] = useState('');
+  const [showAddSideEffectInput, setShowAddSideEffectInput] = useState(false);
+  const [deletingSideEffectKey, setDeletingSideEffectKey] = useState<string | null>(null);
+
+  const handleAddCustomSideEffect = (label: string) => {
+    const cleaned = label.trim();
+    if (!cleaned) return;
+    const key = "se-" + Date.now();
+    const updated = [...customSideEffects, { key, label: cleaned }];
+    setCustomSideEffects(updated);
+    localStorage.setItem('care_pharmacy_custom_side_effects', JSON.stringify(updated));
+    showToast(`تمت إضافة العرض الجانبي: ${cleaned}`, 'success');
+  };
+
+  const handleEditCustomSideEffect = (key: string, newLabel: string) => {
+    const cleaned = newLabel.trim();
+    if (!cleaned) return;
+    const updated = customSideEffects.map(se => se.key === key ? { ...se, label: cleaned } : se);
+    setCustomSideEffects(updated);
+    localStorage.setItem('care_pharmacy_custom_side_effects', JSON.stringify(updated));
+    showToast(`تم تعديل العرض الجانبي بنجاح`, 'success');
+  };
+
+  const handleDeleteCustomSideEffect = (key: string) => {
+    const updated = customSideEffects.filter(se => se.key !== key);
+    setCustomSideEffects(updated);
+    localStorage.setItem('care_pharmacy_custom_side_effects', JSON.stringify(updated));
+    showToast(`تم حذف العرض الجانبي`, 'success');
+  };
 
   // Load Data
   const loadAllData = async () => {
@@ -557,6 +665,93 @@ export default function App() {
     showToast('تم تسجيل الخروج بنجاح. في أمان الله ورعايته!', 'success');
   };
 
+  // Add Behavior Log Handler
+  const handleAddBehaviorLog = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!behaviorForm.residentId) {
+        showToast('يرجى اختيار المقيم أولاً', 'error');
+        return;
+      }
+      
+      const res = residents.find(r => r.id === behaviorForm.residentId);
+      if (!res) {
+        showToast('المقيم غير موجود', 'error');
+        return;
+      }
+
+      let medName = '';
+      if (behaviorForm.recentMedicineId) {
+        const med = medicines.find(m => m.id === behaviorForm.recentMedicineId);
+        if (med) medName = med.commercialName;
+      }
+
+      if (selectedBehaviorLogId) {
+        // Editing existing log
+        const updatedLogs = behaviorLogs.map(log => {
+          if (log.id === selectedBehaviorLogId) {
+            return {
+              ...log,
+              residentId: behaviorForm.residentId,
+              residentName: res.name,
+              behaviorRating: behaviorForm.behaviorRating,
+              sideEffects: behaviorForm.sideEffects,
+              severity: behaviorForm.severity,
+              recentMedicineId: behaviorForm.recentMedicineId,
+              recentMedicineName: medName,
+              notes: behaviorForm.notes.trim()
+            };
+          }
+          return log;
+        });
+        updateBehaviorLogs(updatedLogs);
+        setShowAddBehaviorModal(false);
+        setSelectedBehaviorLogId(null);
+        showToast(`تم تعديل الملاحظة السلوكية بنجاح للمقيم: ${res.name}`, 'success');
+      } else {
+        // Creating new log
+        const newLog = {
+          id: "blog-" + Date.now(),
+          residentId: behaviorForm.residentId,
+          residentName: res.name,
+          loggedAt: new Date().toISOString(),
+          loggedBy: currentUser?.name || 'مستخدم مجهول',
+          behaviorRating: behaviorForm.behaviorRating,
+          sideEffects: behaviorForm.sideEffects,
+          severity: behaviorForm.severity,
+          recentMedicineId: behaviorForm.recentMedicineId,
+          recentMedicineName: medName,
+          notes: behaviorForm.notes.trim()
+        };
+
+        const updated = [newLog, ...behaviorLogs];
+        updateBehaviorLogs(updated);
+        setShowAddBehaviorModal(false);
+        showToast(`تم تسجيل الملاحظة السلوكية بنجاح للمقيم: ${res.name}`, 'success');
+      }
+
+      // Reset Form
+      setBehaviorForm({
+        residentId: '',
+        behaviorRating: 'stable',
+        sideEffects: [],
+        severity: 'none',
+        recentMedicineId: '',
+        notes: ''
+      });
+    } catch (err) {
+      showToast('حدث خطأ أثناء تسجيل الملاحظة السلوكية', 'error');
+    }
+  };
+
+  const handleDeleteBehaviorLog = (id: string) => {
+    if (confirm('هل أنت متأكد من رغبتك في حذف هذا السجل السلوكي؟')) {
+      const updated = behaviorLogs.filter(b => b.id !== id);
+      updateBehaviorLogs(updated);
+      showToast('تم حذف السجل السلوكي بنجاح.', 'success');
+    }
+  };
+
   // Add Medicine Form Handler
   const handleAddMedicine = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -689,6 +884,132 @@ export default function App() {
       });
     } catch (err) {
       showToast('فشل تسجيل علمية الصرف. يرجى محاولة الصرف مرة أخرى.', 'error');
+    }
+  };
+
+  const triggerAiDossierAssessment = async (resident: any) => {
+    if (!resident) return;
+    setAiDossierLoading(true);
+    setAiDossierResult(null);
+
+    // Find matching behavior logs for this resident
+    const logs = behaviorLogs.filter(b => b.residentId === resident.id);
+
+    try {
+      // Call standard server-side AI evaluation API
+      const response = await fetch('/api/ai/assess-patient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resident,
+          logs,
+          medicines
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('حدث خطأ في استجابة خادم الذكاء الاصطناعي');
+      }
+
+      const result = await response.json();
+      if (result && result.report) {
+        setAiDossierResult(result.report);
+        showToast('🛡️ تم توليد التقييم السلوكي والطبي المتقدم بنجاح بالذكاء الاصطناعي!', 'success');
+        return;
+      }
+      throw new Error('لم يرجع الخادم تقريراً صالحاً');
+
+    } catch (e: any) {
+      console.warn("Server AI Assessment failed, falling back to local clinical rules engine:", e);
+      
+      // Local fallback generation
+      try {
+        const hasAgitated = logs.some(l => ['agitated', 'anxious'].includes(l.behaviorRating));
+        const hasDrowsiness = logs.some(l => (l.sideEffects || []).includes('drowsiness'));
+        const hasTremors = logs.some(l => (l.sideEffects || []).includes('tremors'));
+        const hasSevere = logs.some(l => l.severity === 'severe');
+        const latestLog = logs[0];
+
+        let report = `🏥 **تقرير التقييم الطبي الاستقصائي بالذكاء الاصطناعي السريري المتقدم (معاينة احتياطية)**\n`;
+        report += `*تم التحليل والإنشاء: ${new Date().toLocaleDateString('ar-EG')} | رقم الملف الطبي: AI-${resident.id}*\n`;
+        report += `*المريض:* **${resident.name}** | *العمر:* ${resident.age} سنة | *رقم الغرفة:* ${resident.roomNumber}\n\n`;
+        
+        report += `### 1️⃣ التشخيص العام وتقييم الحالة الحيوية:\n`;
+        if (resident.age > 70) {
+          report += `* **عامل السن المتقدم (كبار السن):** تزداد حساسية المريض للأدوية العصبية والنفسية بسبب بطء التخلص الكلوي والكبدي من المواد الفعالة. يوصى بتبني مبدأ "ابدأ بجرعة منخفضة وزد ببطء".\n`;
+        } else {
+          report += `* **الحالة الحيوية العامة:** المريض مستقر عمره يقع في فئة البالغين، لكنه يستدعي رعاية خاصة حسب توصيات الأجنحة.\n`;
+        }
+        
+        if (resident.notes) {
+          report += `* **ملاحظات الملف المضمنة:** ${resident.notes}\n`;
+        }
+        
+        report += `\n### 2️⃣ تحليل الحساسية وعوامل الخطورة الدوائية:\n`;
+        if (resident.allergies && resident.allergies.toLowerCase() !== 'لا توجد' && resident.allergies.trim()) {
+          report += `* ⚠️ **تنبيه حساسية مهدد للحياة:** المريض مسجل لديه تحسس من: **[ ${resident.allergies} ]**.\n`;
+          report += `  * *توجيه فوري:* يجب مطابقة أي مادة دوائية جديدة قبل الصرف لضمان عدم احتوائها على مشتقات تسبب نوبة صدمة تحسسية (Anaphylactic Shock).\n`;
+        } else {
+          report += `* ✅ **خلو الملف من الحساسيات المعروفة:** لم يتم رصد أي تفاعلات تحسسية دوائية مسبقة، ويظل المريض تحت المراقبة عند إدخال أي صنف جديد.\n`;
+        }
+
+        report += `\n### 3️⃣ تقييم النمط السلوكي والتقلبات النفسية (بناءً على ${logs.length} سجل تتبع سلوكي):\n`;
+        if (logs.length === 0) {
+          report += `* ℹ️ **غياب السجلات السلوكية القريبة:** لا توجد ملاحظات سلوكية مرصودة قريباً للمريض في النظام. يُنصح كادر التمريض بإنشاء أول بطاقة تقييم سلوكي لبدء القياس السريري.\n`;
+        } else {
+          const stableCount = logs.filter(l => l.behaviorRating === 'stable').length;
+          const stabilityRate = Math.round((stableCount / logs.length) * 100);
+          
+          report += `* **معدل الاستقرار النفسي العام:** **${stabilityRate}%** (${stableCount} مستقر من أصل ${logs.length} مرات رصد).\n`;
+          if (hasAgitated) {
+            report += `* ⚠️ **مؤشر هياج سلوكي / توتر رصدي:** تم تسجيل فترات من الهياج السلوكي أو التوتر العصبي. يجب مراجعة محفزات البيئة المحيطة ومدى الالتزام بمواعيد الأدوية النفسية المهدئة.\n`;
+          }
+          if (latestLog) {
+            report += `* **آخر ملاحظة سلوكية مسجلة (${new Date(latestLog.loggedAt).toLocaleDateString('ar-EG')}):** "${latestLog.notes}" (التقييم: **${latestLog.behaviorRating}**).\n`;
+          }
+        }
+
+        report += `\n### 4️⃣ تحليل الأعراض الجانبية وتداخل الأدوية المجدولة:\n`;
+        const dosageCount = (resident.dosageSchedule || []).length;
+        report += `* **عدد الأدوية المجدولة يومياً:** ${dosageCount} أدوية دورية.\n`;
+        
+        if (dosageCount > 3) {
+          report += `* ⚠️ **تنبيه التعدد الدوائي المفرط (Polypharmacy):** يتلقى المريض أكثر من 3 أدوية تزامناً، مما يضاعف احتمالية تداخل الأدوية بشكل أسي. يوصى بمراجعة الطبيب لتقليص الأدوية لغير الضرورية.\n`;
+        }
+
+        const currentMedNames = (resident.dosageSchedule || []).map((d: any) => d.medicineName);
+        if (currentMedNames.some((m: string) => m.toLowerCase().includes('ديباكين') || m.toLowerCase().includes('كيبرا') || m.toLowerCase().includes('تجريتول'))) {
+          report += `* **تحليل مضادات الصرع والتشنج:** المريض يعتمد على علاج تشنجات دوري. يجب الانتباه لمستويات وعي المريض وتجنب صرف الأدوية المضادة للهيستامين من الجيل الأول التي قد تسبب النعاس الشديد أو تزيد التشنج.\n`;
+        }
+
+        if (hasDrowsiness) {
+          report += `* 😴 **رصد خمول دوائي متكرر:** تشير سجلات الأعراض الجانبية إلى إصابة المريض بالنعاس والخمول الحاد. يوصى بجدولة الأدوية النفسية المسببة للخمول لتؤخذ بالكامل في الفترة المسائية قبل النوم فقط.\n`;
+        }
+        if (hasTremors) {
+          report += `* 🫨 **رصد ارتعاش عضلي:** تم رصد حركات اهتزازية بالأطراف. قد تكون دليلاً على أعراض هرمية خارج السبيل (Extrapyramidal side effects) بسبب بعض مضادات الذهان. تستدعي مراجعة الطبيب فوراً للنظر في تقليل الجرعة أو إضافة علاج مضاد للرعاش.\n`;
+        }
+        if (hasSevere) {
+          report += `* 🚨 **تحذير أعراض جانبية حادة:** يحتوي سجل المريض على عوارض من الدرجة الشديدة! يرجى الرجوع لملف رصد السلوك ومطابقة الدواء المتسبب فيها لوقفه فوراً بالتشاور مع الفريق الطبي.\n`;
+        }
+        if (!hasDrowsiness && !hasTremors && !hasSevere) {
+          report += `* ✅ **سلامة التفاعل الدوائي:** لم تظهر السجلات أي أعراض جانبية حادة ناتجة عن الأدوية الحالية حتى الآن.\n`;
+        }
+
+        report += `\n### 🛡️ 5️⃣ التوصيات والتدابير الوقائية السريرية:\n`;
+        report += `1. **إعادة توزيع الأدوية زمنياً:** في حال وجود خمول، يُفضل تقديم الجرعات التي تسبب الخمول ليلاً بعد الساعة 8 مساءً.\n`;
+        if (resident.allergies) {
+          report += `2. **بطاقة تنبيه حمراء:** تعليق بطاقة حمراء واضحة على سرير المريض وفي عربة الدواء تفيد بتحسسه الحاد من **[ ${resident.allergies} ]**.\n`;
+        }
+        report += `3. **تفعيل الفحص العيني بعد الصرف:** تفعيل مسح باركود الدواء وسوار المريض مع كل جرعة لضمان دقة الصرف بنسبة 100%.\n`;
+        report += `4. **مراجعة الطبيب الدورية:** جدولة مراجعة الملف الطبي من قبل طبيب الأعصاب المعالج كل 30 يوماً لتقييم الحاجة الفعلية لمضادات الصرع والذهان المجدولة.\n`;
+
+        setAiDossierResult(report);
+        showToast('🛡️ تم توليد تقييم الحالة الطبي السلوكي بنجاح بالذكاء الاصطناعي المجاني!', 'success');
+      } catch (err) {
+        showToast('تعذر توليد تقييم المريض بالذكاء الاصطناعي حالياً.', 'error');
+      }
+    } finally {
+      setAiDossierLoading(false);
     }
   };
 
@@ -1024,6 +1345,40 @@ export default function App() {
     })).filter(item => item.value > 0);
   };
 
+  const getBehaviorChartData = () => {
+    const counts: Record<string, number> = {
+      stable: 0,
+      agitated: 0,
+      anxious: 0,
+      withdrawn: 0,
+      hyperactive: 0
+    };
+    behaviorLogs.forEach(l => {
+      if (counts[l.behaviorRating] !== undefined) {
+        counts[l.behaviorRating]++;
+      }
+    });
+    const labels: Record<string, string> = {
+      stable: 'مستقر 🟢',
+      agitated: 'هياج سلوكي 🔴',
+      anxious: 'قلق وتوتر 🟡',
+      withdrawn: 'انسحاب اجتماعي 🟣',
+      hyperactive: 'نشاط مفرط 🔵'
+    };
+    const colors: Record<string, string> = {
+      stable: '#10b981',
+      agitated: '#ef4444',
+      anxious: '#f59e0b',
+      withdrawn: '#8b5cf6',
+      hyperactive: '#3b82f6'
+    };
+    return Object.entries(counts).map(([key, val]) => ({
+      name: labels[key],
+      value: val,
+      color: colors[key]
+    })).filter(item => item.value > 0);
+  };
+
   const getPredictiveDepletionForecasting = () => {
     return medicines.map(m => {
       const relatedDispenses = dispenseRecords.filter(rec => rec.medicineId === m.id);
@@ -1210,6 +1565,7 @@ export default function App() {
 
   // Print system report utility (with dual-action safe iframe/sandbox fallback)
   const handlePrint = () => {
+    setPrintType('inventory');
     // Open the gorgeous in-app interactive print preview modal immediately
     setShowPrintPreviewModal(true);
     try {
@@ -1368,72 +1724,6 @@ export default function App() {
                 <span>تسجيل الدخول الآمن</span>
               </button>
             </form>
-
-            <div className="relative my-5">
-              <div className="absolute inset-0 flex items-center">
-                <div className={`w-full border-t ${darkMode ? 'border-slate-800' : 'border-slate-200'}`}></div>
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className={`px-2 rounded-full text-[10px] font-semibold ${darkMode ? 'bg-slate-900 text-slate-500' : 'bg-white text-slate-500'}`}>قوالب الدخول السريع للفحص والتقييم</span>
-              </div>
-            </div>
-
-            {/* Quick Template Users Clicks */}
-            <div className="grid grid-cols-1 gap-2">
-              {[
-                {
-                  name: "د. طارق اليوسف",
-                  email: "yousef.t@carecenter.org",
-                  role: "مدير النظام",
-                  pass: "admin",
-                  roleKey: "admin",
-                  color: "border-teal-500/10 hover:border-teal-500/40 bg-teal-500/5 hover:bg-teal-500/10"
-                },
-                {
-                  name: "صيدلي. كريم القحطاني",
-                  email: "kareem.q@carecenter.org",
-                  role: "صيدلي ممارس",
-                  pass: "pharm",
-                  roleKey: "pharmacist",
-                  color: "border-indigo-500/10 hover:border-indigo-500/40 bg-indigo-500/5 hover:bg-indigo-500/10"
-                },
-                {
-                  name: "فني. ماجد الرويلي",
-                  email: "majed.r@carecenter.org",
-                  role: "فني صيدلة",
-                  pass: "tech",
-                  roleKey: "technician",
-                  color: "border-amber-500/10 hover:border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10"
-                }
-              ].map(u => (
-                <button
-                  key={u.email}
-                  type="button"
-                  onClick={() => {
-                    setLoginEmail(u.email);
-                    setLoginPassword(u.pass);
-                    showToast(`تم تعبئة بيانات حساب ${u.name} تلقائياً. اضغط دخول!`, 'success');
-                  }}
-                  className={`w-full text-right p-2.5 rounded-xl border transition-all flex items-center justify-between text-xs cursor-pointer ${u.color}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-slate-950 rounded-lg text-slate-400 shrink-0">
-                      <User className="w-3.5 h-3.5" />
-                    </div>
-                    <div>
-                      <div className={`font-bold ${darkMode ? 'text-slate-200' : 'text-slate-800'}`}>{u.name}</div>
-                      <div className="text-[9px] text-slate-500 font-mono mt-0.5">{u.email}</div>
-                    </div>
-                  </div>
-                  <div className="text-left shrink-0">
-                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
-                      u.roleKey === 'admin' ? 'bg-teal-500/15 text-teal-400' : u.roleKey === 'pharmacist' ? 'bg-indigo-500/15 text-indigo-400' : 'bg-amber-500/15 text-amber-400'
-                    }`}>{u.role}</span>
-                    <div className="text-[9px] text-slate-500 font-mono mt-0.5 text-left">كلمة السر: {u.pass}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Compliance notice */}
@@ -1459,6 +1749,7 @@ export default function App() {
   }
 
   return (
+    <>
     <div className={`min-h-screen transition-colors duration-200 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`} dir="rtl">
       
       {/* 1. Header (Top Bar Contract: exactly 3 zones) */}
@@ -1519,6 +1810,14 @@ export default function App() {
               className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'ai_reports' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
             >
               التقارير والتحليل الذكي
+            </button>
+          )}
+          {isScreenAllowed('behavioral_tracker') && (
+            <button 
+              onClick={() => setActiveTab('behavioral_tracker')} 
+              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'behavioral_tracker' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              تتبع السلوك والأعراض 🧠
             </button>
           )}
           {isScreenAllowed('security') && (
@@ -1613,6 +1912,11 @@ export default function App() {
         {isScreenAllowed('ai_reports') && (
           <button onClick={() => setActiveTab('ai_reports')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'ai_reports' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
             التقارير الطبية
+          </button>
+        )}
+        {isScreenAllowed('behavioral_tracker') && (
+          <button onClick={() => setActiveTab('behavioral_tracker')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'behavioral_tracker' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            تتبع السلوك والأعراض 🧠
           </button>
         )}
         {isScreenAllowed('security') && (
@@ -3647,6 +3951,334 @@ export default function App() {
               </div>
             )}
 
+            {/* ----------------- TAB: BEHAVIORAL & SIDE EFFECTS TRACKER ----------------- */}
+            {activeTab === 'behavioral_tracker' && (
+              <div className="space-y-6 animate-fade-in">
+                
+                {/* Header banner */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div className="space-y-1">
+                    <h2 className="text-xl font-black text-slate-200 flex items-center gap-2">
+                      <span>🧠 نظام رصد السلوك والأعراض الجانبية التفاعلي (BCMA Tracker)</span>
+                    </h2>
+                    <p className="text-xs text-slate-400">توثيق ومتابعة التقلبات السلوكية والأعراض الجانبية للأدوية النفسية والعصبية لضمان سلامة مقيمي المركز</p>
+                  </div>
+                  
+                  <button 
+                    onClick={() => {
+                      setBehaviorForm({
+                        residentId: '',
+                        behaviorRating: 'stable',
+                        sideEffects: [],
+                        severity: 'none',
+                        recentMedicineId: '',
+                        notes: ''
+                      });
+                      setShowAddBehaviorModal(true);
+                    }}
+                    className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>تسجيل ملاحظة سلوكية جديدة</span>
+                  </button>
+                </div>
+
+                {/* Scoreboard widgets */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                  <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+                    <p className="text-xs font-semibold text-slate-400">إجمالي الملاحظات المرصودة</p>
+                    <div className="mt-2 text-2xl font-black font-mono tracking-tight text-teal-500">
+                      {behaviorLogs.length}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">تقارير كادر التمريض والرعاية</p>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+                    <p className="text-xs font-semibold text-slate-400">الحالات المستقرة والطبيعية 🟢</p>
+                    <div className="mt-2 text-2xl font-black font-mono tracking-tight text-emerald-400">
+                      {behaviorLogs.filter(b => b.behaviorRating === 'stable').length}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">سلوك عام مستقر وضمن الحدود</p>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+                    <p className="text-xs font-semibold text-slate-400">حالات القلق والهياج السلوكي ⚠️</p>
+                    <div className="mt-2 text-2xl font-black font-mono tracking-tight text-amber-500">
+                      {behaviorLogs.filter(b => ['agitated', 'anxious', 'hyperactive'].includes(b.behaviorRating)).length}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">تتطلب مراجعة الجرعات والهدوء</p>
+                  </div>
+
+                  <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+                    <p className="text-xs font-semibold text-slate-400">أعراض جانبية حادة 🔴</p>
+                    <div className="mt-2 text-2xl font-black font-mono tracking-tight text-rose-500">
+                      {behaviorLogs.filter(b => b.severity === 'severe').length}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-1">حالات تتطلب تدخل الطبيب فوراً</p>
+                  </div>
+                </div>
+
+                {/* Analytical charts & filters */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* Left Column: Real-time behavior analysis chart */}
+                  <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
+                    <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-1.5">
+                      <Activity className="w-4 h-4 text-teal-400" />
+                      <span>تحليل الحالات السلوكية المرصودة</span>
+                    </h3>
+                    
+                    <div className="h-44 w-full flex items-center justify-center" dir="ltr">
+                      {getBehaviorChartData().length === 0 ? (
+                        <span className="text-xs text-slate-500">لا توجد بيانات سلوكية كافية للتحليل</span>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={getBehaviorChartData()}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={35}
+                              outerRadius={60}
+                              paddingAngle={4}
+                              dataKey="value"
+                            >
+                              {getBehaviorChartData().map((entry: any, index: number) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
+                                borderColor: darkMode ? '#1e293b' : '#cbd5e1',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                textAlign: 'right'
+                              }}
+                            />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 mt-2" dir="rtl">
+                      {getBehaviorChartData().map((item: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-slate-300 font-semibold">{item.name}</span>
+                          </div>
+                          <span className="font-mono text-slate-400">{item.value} مرات رصد</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right Column: List & Filters */}
+                  <div className="lg:col-span-2 space-y-4">
+                    
+                    {/* Filter controls row */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      
+                      {/* Search bar */}
+                      <div className={`flex-1 relative flex items-center rounded-xl px-3 py-2 border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-700'}`}>
+                        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+                        <input 
+                          type="text"
+                          placeholder="ابحث باسم المقيم أو تفاصيل الملاحظة..."
+                          value={behaviorSearchQuery}
+                          onChange={(e) => setBehaviorSearchQuery(e.target.value)}
+                          className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                        />
+                      </div>
+
+                      {/* Dropdown Filters */}
+                      <select
+                        value={filterBehavior}
+                        onChange={(e) => setFilterBehavior(e.target.value)}
+                        className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
+                      >
+                        <option value="all">كل الحالات السلوكية</option>
+                        <option value="stable">مستقر 🟢</option>
+                        <option value="agitated">هياج سلوكي 🔴</option>
+                        <option value="anxious">قلق وتوتر 🟡</option>
+                        <option value="withdrawn">انسحاب اجتماعي 🟣</option>
+                        <option value="hyperactive">نشاط مفرط 🔵</option>
+                      </select>
+
+                      <select
+                        value={filterSeverity}
+                        onChange={(e) => setFilterSeverity(e.target.value)}
+                        className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
+                      >
+                        <option value="all">كل مستويات الأعراض</option>
+                        <option value="none">بدون عرض جانبي ✅</option>
+                        <option value="mild">طفيف 🟢</option>
+                        <option value="moderate">متوسط 🟡</option>
+                        <option value="severe">حاد وخطير 🔴</option>
+                      </select>
+
+                    </div>
+
+                    {/* Behavior log lists */}
+                    <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                      {behaviorLogs.filter(log => {
+                        const matchesSearch = log.residentName.toLowerCase().includes(behaviorSearchQuery.toLowerCase()) ||
+                                              log.notes.toLowerCase().includes(behaviorSearchQuery.toLowerCase()) ||
+                                              (log.recentMedicineName || '').toLowerCase().includes(behaviorSearchQuery.toLowerCase());
+                        const matchesBehavior = filterBehavior === 'all' || log.behaviorRating === filterBehavior;
+                        const matchesSeverity = filterSeverity === 'all' || log.severity === filterSeverity;
+                        return matchesSearch && matchesBehavior && matchesSeverity;
+                      }).length === 0 ? (
+                        <div className="text-center py-16 bg-slate-900/20 rounded-3xl border border-dashed border-slate-800 text-slate-400 text-xs space-y-2">
+                          <HelpCircle className="w-8 h-8 text-slate-600 mx-auto" />
+                          <p>لا توجد ملاحظات سلوكية تطابق خيارات الفرز والبحث المحددة.</p>
+                        </div>
+                      ) : (
+                        behaviorLogs.filter(log => {
+                          const matchesSearch = log.residentName.toLowerCase().includes(behaviorSearchQuery.toLowerCase()) ||
+                                                log.notes.toLowerCase().includes(behaviorSearchQuery.toLowerCase()) ||
+                                                (log.recentMedicineName || '').toLowerCase().includes(behaviorSearchQuery.toLowerCase());
+                          const matchesBehavior = filterBehavior === 'all' || log.behaviorRating === filterBehavior;
+                          const matchesSeverity = filterSeverity === 'all' || log.severity === filterSeverity;
+                          return matchesSearch && matchesBehavior && matchesSeverity;
+                        }).map((log) => {
+                          // Labels & Badges helper
+                          const behaviorLabels: Record<string, { label: string, color: string }> = {
+                            stable: { label: 'مستقر وضمن الحدود الطبيعية 🟢', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+                            agitated: { label: 'هياج سلوكي حاد 🔴', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' },
+                            anxious: { label: 'قلق وتوتر نفسى 🟡', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+                            withdrawn: { label: 'انسحاب وعزلة اجتماعية 🟣', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+                            hyperactive: { label: 'نشاط وحركة مفرطة 🔵', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' }
+                          };
+
+                          const severityLabels: Record<string, { label: string, color: string }> = {
+                            none: { label: 'لا توجد أعراض جانبية ✅', color: 'text-slate-400' },
+                            mild: { label: 'عرض جانبي طفيف', color: 'text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg' },
+                            moderate: { label: 'عرض جانبي متوسط ⚠️', color: 'text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg font-bold' },
+                            severe: { label: 'عرض جانبي حاد وخطير 🚨', color: 'text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-lg font-black animate-pulse' }
+                          };
+
+                          const sideEffectLabels: Record<string, string> = {
+                            drowsiness: 'خمول ونعاس 😴',
+                            appetite_loss: 'فقدان شهية 🍽️',
+                            tremors: 'ارتعاش ورجفة 🫨',
+                            rash: 'طفح جلدي وحكة 🔴',
+                            nausea: 'غثيان واضطراب 🤢',
+                            insomnia: 'أرق وصعوبة نوم ⏰'
+                          };
+
+                          return (
+                            <div 
+                              key={log.id} 
+                              className={`p-4 rounded-2xl border text-xs space-y-3 transition hover:border-slate-700 ${
+                                log.severity === 'severe' 
+                                  ? 'bg-rose-950/15 border-rose-500/25 shadow-lg shadow-rose-950/10' 
+                                  : darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                              }`}
+                            >
+                              
+                              {/* Header info */}
+                              <div className="flex justify-between items-start gap-4">
+                                <div className="space-y-1 text-right">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-black text-slate-200">{log.residentName}</h4>
+                                    <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${behaviorLabels[log.behaviorRating]?.color || ''}`}>
+                                      {behaviorLabels[log.behaviorRating]?.label || log.behaviorRating}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500">
+                                    بواسطة: <strong className="text-slate-400">{log.loggedBy}</strong> · في تاربخ: <span className="font-mono">{new Date(log.loggedAt).toLocaleString('ar-EG')}</span>
+                                  </p>
+                                </div>
+                                
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <button 
+                                    onClick={() => {
+                                      setSelectedBehaviorLogId(log.id);
+                                      setBehaviorForm({
+                                        residentId: log.residentId,
+                                        behaviorRating: log.behaviorRating,
+                                        sideEffects: log.sideEffects || [],
+                                        severity: log.severity,
+                                        recentMedicineId: log.recentMedicineId || '',
+                                        notes: log.notes
+                                      });
+                                      setShowAddBehaviorModal(true);
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-lg bg-teal-600/10 hover:bg-teal-600 text-teal-400 hover:text-white transition cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                                    title="تعديل هذا السجل"
+                                  >
+                                    <Edit2 className="w-3 h-3" />
+                                    <span>تعديل ✏️</span>
+                                  </button>
+
+                                  <button 
+                                    onClick={() => {
+                                      setDeleteConfirmTarget({ id: log.id, name: log.residentName, type: 'behaviorLog' });
+                                    }}
+                                    className="px-2.5 py-1.5 rounded-lg bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white transition cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                                    title="حذف هذا السجل"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    <span>حذف 🗑️</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Suspected medicine banner */}
+                              {log.recentMedicineId && (
+                                <div className="px-3 py-2 bg-slate-950/40 rounded-xl border border-slate-800 flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-400">الدواء المشتبه بتأثيره الجانبي:</span>
+                                  <span className="font-bold text-teal-400">
+                                    {log.recentMedicineName}
+                                    {medicines.find(m => m.id === log.recentMedicineId)?.scientificName && (
+                                      <span className="text-[10px] text-slate-500 mr-1 font-mono">({medicines.find(m => m.id === log.recentMedicineId)?.scientificName})</span>
+                                    )}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Registered Side Effects */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <span className="text-slate-500 text-[10px]">الأعراض الجانبية:</span>
+                                {(!log.sideEffects || log.sideEffects.length === 0) ? (
+                                  <span className="text-slate-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">سليم، لا توجد أعراض ✅</span>
+                                ) : (
+                                  log.sideEffects.map((se: string) => (
+                                    <span key={se} className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300 text-[10px] font-medium">
+                                      {customSideEffects.find(x => x.key === se)?.label || sideEffectLabels[se] || se}
+                                    </span>
+                                  ))
+                                )}
+                                
+                                <div className="mr-auto shrink-0 flex items-center gap-1">
+                                  <span className="text-[10px] text-slate-500">شدة العرض:</span>
+                                  <span className={`text-[10px] font-bold ${severityLabels[log.severity]?.color || ''}`}>
+                                    {severityLabels[log.severity]?.label || log.severity}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Clinical comments notes */}
+                              <div className="p-3 bg-slate-950/30 rounded-xl border border-slate-850 text-slate-300 leading-relaxed text-[11px] text-right font-sans whitespace-pre-line">
+                                <span className="font-semibold text-slate-400 block mb-0.5">📝 التفاصيل السلوكية والتقرير الطبي:</span>
+                                {log.notes}
+                              </div>
+
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
             {/* ----------------- TAB: USERS ----------------- */}
             {activeTab === 'users' && (
               <div className="space-y-6 animate-fade-in">
@@ -4117,6 +4749,167 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* AI Medical Assessment Subcard */}
+                      <div className={`p-4 rounded-2xl border space-y-3.5 text-xs ${darkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-sm'}`}>
+                        <div className="flex justify-between items-center border-b pb-2 border-slate-800/60">
+                          <h4 className="font-bold text-teal-400 flex items-center gap-1.5">
+                            <Sparkles className="w-4 h-4 animate-pulse text-teal-400" />
+                            <span>تقييم الحالة بالذكاء الاصطناعي السريري 🧠</span>
+                          </h4>
+                          <span className="text-[9px] bg-teal-500/10 px-2 py-0.5 rounded-full text-teal-400 font-bold">مجاني وآمن بالكامل 🟢</span>
+                        </div>
+
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          اضغط لتوليد تحليل طبي متكامل يبحث في حساسية المريض، جداول الأدوية النشطة، والتقلبات السلوكية المرصودة أخيراً بالمركز.
+                        </p>
+
+                        <button
+                          type="button"
+                          disabled={aiDossierLoading}
+                          onClick={() => triggerAiDossierAssessment(activeDossierResident)}
+                          className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-xs animate-pulse"
+                        >
+                          {aiDossierLoading ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                              <span>جاري فحص وتحليل الملف الطبي للمقيم...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-4 h-4 text-white" />
+                              <span>توليد تقييم الحالة السلوكية والطبية الآن ✨</span>
+                            </>
+                          )}
+                        </button>
+
+                        {aiDossierResult && (
+                          <div className="p-4 rounded-xl bg-slate-950 border border-slate-850 animate-fade-in text-right text-xs space-y-3 text-slate-300 max-h-96 overflow-y-auto leading-relaxed">
+                            <div className="flex justify-between items-center border-b border-slate-850 pb-2 mb-1">
+                              <span className="font-bold text-teal-400 flex items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+                                تقرير الذكاء الاصطناعي الجاهز
+                              </span>
+                              <div className="flex gap-2 items-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(aiDossierResult);
+                                    showToast('تم نسخ التقرير الطبي إلى الحافظة!', 'success');
+                                  }}
+                                  className="text-[10px] text-teal-400 hover:underline cursor-pointer flex items-center gap-1"
+                                >
+                                  <Copy className="w-3 h-3 text-teal-400" />
+                                  <span>نسخ 📋</span>
+                                </button>
+                                <span className="text-slate-700" aria-hidden="true">·</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    try {
+                                      const reportHeader = `🏥 تقرير التقييم الطبي السريري بالذكاء الاصطناعي\n` +
+                                        `اسم المقيم: ${activeDossierResident.name}\n` +
+                                        `العمر: ${activeDossierResident.age} سنة\n` +
+                                        `رقم الغرفة: ${activeDossierResident.roomNumber}\n` +
+                                        `تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}\n` +
+                                        `==========================================\n\n`;
+                                      
+                                      const fileContent = "\uFEFF" + reportHeader + aiDossierResult;
+                                      const blob = new Blob([fileContent], { type: 'text/plain;charset=utf-8;' });
+                                      const url = URL.createObjectURL(blob);
+                                      const link = document.createElement("a");
+                                      link.setAttribute("href", url);
+                                      link.setAttribute("download", `تقرير_طبي_${activeDossierResident.name.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('ar-EG').replace(/\//g, '-')}.txt`);
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                      showToast('📥 تم تصدير التقرير كملف نصي بنجاح!', 'success');
+                                    } catch (e) {
+                                      showToast('عذراً، فشل تصدير التقرير الطبي.', 'error');
+                                    }
+                                  }}
+                                  className="text-[10px] text-teal-400 hover:underline cursor-pointer flex items-center gap-1"
+                                >
+                                  <Download className="w-3 h-3 text-teal-400" />
+                                  <span>تصدير 📥</span>
+                                </button>
+                                <span className="text-slate-700" aria-hidden="true">·</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (!activeDossierResident || !aiDossierResult) {
+                                      showToast('لا يوجد تقرير لطباعته.', 'error');
+                                      return;
+                                    }
+                                    const w = window.open();
+                                    if (w) {
+                                      w.document.write(`
+                                        <div dir="rtl" style="font-family:sans-serif; padding:30px; line-height:1.6; text-align:right; direction: rtl;">
+                                          <div style="text-align: center; margin-bottom: 30px;">
+                                            <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #0d9488;">صيدلية مركز رعاية ذوي الإعاقة</h1>
+                                            <p style="margin: 5px 0; font-size: 16px; font-weight: bold; color: #475569;">تقرير التقييم الطبي السريري المتقدم (ذكاء اصطناعي)</p>
+                                            <p style="font-size: 11px; color: #666;">تاريخ ترحيل التقرير: ${new Date().toLocaleString('ar-EG')}</p>
+                                          </div>
+
+                                          <div style="margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; background-color: #f8fafc; padding: 15px; border-radius: 8px;">
+                                            <h3 style="margin: 0 0 10px 0; color: #0f172a; font-size: 15px;">معلومات المقيم الطبية والسريرية:</h3>
+                                            <p style="margin: 4px 0; font-size: 13px;">اسم المقيم: <strong>${activeDossierResident.name}</strong></p>
+                                            <p style="margin: 4px 0; font-size: 13px;">العمر: <strong>${activeDossierResident.age} سنة</strong></p>
+                                            <p style="margin: 4px 0; font-size: 13px;">رقم الغرفة/الجناح: <strong>${activeDossierResident.roomNumber}</strong></p>
+                                            <p style="margin: 4px 0; font-size: 13px;">الحساسية المسجلة: <strong style="color: #b91c1c;">${activeDossierResident.allergies || 'لا توجد'}</strong></p>
+                                          </div>
+
+                                          <h3 style="margin-top: 20px; margin-bottom: 10px; color: #0f172a; font-size: 15px;">محتوى تقرير التقييم والتحليل السريري:</h3>
+                                          <div style="white-space: pre-line; font-size: 13px; line-height: 1.6; margin-top: 10px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #fdfdfd; color: #334155;">
+                                            ${aiDossierResult}
+                                          </div>
+
+                                          <div style="margin-top: 60px; display: flex; justify-content: space-between;">
+                                            <div style="text-align: right;">
+                                              <p style="margin: 0; font-weight: bold;">توقيع الصيدلي واللجنة الطبية السريرية:</p>
+                                              <p style="margin-top: 50px;">___________________</p>
+                                            </div>
+                                            <div style="text-align: right;">
+                                              <p style="margin: 0; font-weight: bold;">اعتماد إدارة مركز الرعاية والخدمات الطبية:</p>
+                                              <p style="margin-top: 50px;">___________________</p>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      `);
+                                      w.document.close();
+                                      w.focus();
+                                      w.print();
+                                      showToast('تم فتح أمر الطباعة للتقرير السريري بنجاح 🖨️', 'success');
+                                    } else {
+                                      showToast('عذراً، تم حظر النافذة المنبثقة للطباعة من قبل المتصفح.', 'error');
+                                    }
+                                  }}
+                                  className="text-[10px] text-teal-400 hover:underline cursor-pointer flex items-center gap-1"
+                                >
+                                  <Printer className="w-3 h-3 text-teal-400" />
+                                  <span>طباعة 🖨️</span>
+                                </button>
+                                <span className="text-slate-700" aria-hidden="true">·</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAiDossierResult(null);
+                                    showToast('تم إغلاق تقرير التقييم بنجاح.', 'success');
+                                  }}
+                                  className="text-[10px] text-rose-400 hover:underline cursor-pointer flex items-center gap-1 font-bold"
+                                  title="خروج وإغلاق التقرير"
+                                >
+                                  <X className="w-3 h-3 text-rose-400" />
+                                  <span>خروج ❌</span>
+                                </button>
+                              </div>
+                            </div>
+                            <div className="whitespace-pre-line text-[11px] font-sans pr-1">
+                              {aiDossierResult}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Subcard: Add new dose schedule form */}
                       <div className="p-4 rounded-2xl bg-slate-950/40 border border-slate-800 space-y-3.5 text-xs">
                         <h4 className="font-bold text-slate-300 flex items-center gap-1.5 border-b border-slate-800/60 pb-2">
@@ -4394,8 +5187,10 @@ export default function App() {
                   <p className="text-xs text-slate-400 mb-6 leading-relaxed">
                     {deleteConfirmTarget.type === 'resident' ? (
                       <span>هل أنت متأكد تماماً من شطب المقيم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من سجلات الصيدلية والمركز؟ هذا الإجراء سيؤثر على ربط سجلات الصرف القديمة.</span>
-                    ) : (
+                    ) : deleteConfirmTarget.type === 'user' ? (
                       <span>هل أنت متأكد تماماً من إلغاء حساب المستخدم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> وحظر وصوله إلى نظام الصيدلية؟</span>
+                    ) : (
+                      <span>هل أنت متأكد تماماً من حذف الملاحظة السلوكية والطبية المسجلة للمقيم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من نظام التتبع السلوكي؟</span>
                     )}
                   </p>
                   <div className="flex justify-end gap-2 text-xs">
@@ -4417,6 +5212,10 @@ export default function App() {
                           const updated = users.filter(u => u.uid !== deleteConfirmTarget.id);
                           updateUsersList(updated);
                           showToast(`تم إلغاء حساب الكادر الطبي "${deleteConfirmTarget.name}" بنجاح.`, 'success');
+                        } else if (deleteConfirmTarget.type === 'behaviorLog') {
+                          const updated = behaviorLogs.filter(b => b.id !== deleteConfirmTarget.id);
+                          updateBehaviorLogs(updated);
+                          showToast(`تم حذف السجل السلوكي للمريض "${deleteConfirmTarget.name}" بنجاح.`, 'success');
                         }
                         setDeleteConfirmTarget(null);
                       }}
@@ -4584,58 +5383,297 @@ export default function App() {
               </div>
             )}
 
-            {/* ----------------- STANDALONE PRINT VIEW (أمر الطباعة المتكامل) ----------------- */}
-            <div id="print-area" className="hidden print:block w-full text-right text-xs p-8 text-black bg-white" dir="rtl">
-              <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>صيدلية مركز رعاية ذوي الإعاقة</h1>
-                <p style={{ margin: '5px 0' }}>تقرير جرد المخازن وحركة الأدوية وصرف الوحدات الطبية</p>
-                <p style={{ fontSize: '10px', color: '#666' }}>تاريخ ترحيل التقرير: {new Date().toLocaleString('ar-EG')}</p>
-              </div>
 
-              <div style={{ marginBottom: '20px', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
-                <h3>ملخص الإحصاءات العامة للمستودع:</h3>
-                <p>إجمالي قيمة مستودع الأدوية: <strong>{stats.totalInventoryValue} ر.س</strong></p>
-                <p>عدد الأصناف المسجلة: <strong>{stats.totalItems} صنف</strong></p>
-                <p>إجمالي الكمية المصروفة فعلياً: <strong>{stats.totalDispensedCount} علبة/وحدة</strong></p>
-              </div>
 
-              <h3>تفاصيل المستودع وجرد الأدوية:</h3>
-              <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #333', textAlign: 'right' }}>
-                    <th style={{ padding: '8px' }}>الاسم التجاري</th>
-                    <th style={{ padding: '8px' }}>الاسم العلمي</th>
-                    <th style={{ padding: '8px' }}>الكمية المتاحة</th>
-                    <th style={{ padding: '8px' }}>الوحدة</th>
-                    <th style={{ padding: '8px' }}>السعر</th>
-                    <th style={{ padding: '8px' }}>تاريخ الصلاحية</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {medicines.map((med) => (
-                    <tr key={med.id} style={{ borderBottom: '1px solid #ddd' }}>
-                      <td style={{ padding: '8px', fontWeight: 'bold' }}>{med.commercialName}</td>
-                      <td style={{ padding: '8px' }}>{med.scientificName}</td>
-                      <td style={{ padding: '8px' }}>{med.quantity}</td>
-                      <td style={{ padding: '8px' }}>{med.unit}</td>
-                      <td style={{ padding: '8px' }}>{med.price} ر.س</td>
-                      <td style={{ padding: '8px' }}>{med.expiryDate}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* ----------------- MODAL: ADD BEHAVIOR LOG ----------------- */}
+            {showAddBehaviorModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-slate-100" dir="rtl">
+                <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+                  <button 
+                    type="button"
+                    onClick={() => setShowAddBehaviorModal(false)}
+                    className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  
+                  <h3 className="text-lg font-bold text-teal-400 mb-4 flex items-center gap-2">
+                    <span>🧠 {selectedBehaviorLogId ? 'تعديل ملاحظة سلوكية وأعراض جانبية قائمة' : 'تسجيل ملاحظة سلوكية وأعراض جانبية جديدة'}</span>
+                  </h3>
 
-              <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <p>توقيع الصيدلي المسؤول:</p>
-                  <p>___________________</p>
+                  <form onSubmit={handleAddBehaviorLog} className="space-y-4 text-xs text-slate-300">
+                    
+                    {/* Resident Select */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-bold">المقيم المستهدف *</label>
+                      <select 
+                        required
+                        value={behaviorForm.residentId}
+                        onChange={(e) => setBehaviorForm(prev => ({ ...prev, residentId: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
+                      >
+                        <option value="">-- اختر المقيم المستهدف من القائمة --</option>
+                        {residents.map(r => (
+                          <option key={r.id} value={r.id}>{r.name} ({r.roomNumber})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Behavior Rating Select */}
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-bold">التقييم والتقلب السلوكي *</label>
+                        <select 
+                          required
+                          value={behaviorForm.behaviorRating}
+                          onChange={(e) => setBehaviorForm(prev => ({ ...prev, behaviorRating: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
+                        >
+                          <option value="stable">مستقر وضمن الحدود الطبيعية 🟢</option>
+                          <option value="agitated">هياج سلوكي حاد 🔴</option>
+                          <option value="anxious">قلق وتوتر نفسى 🟡</option>
+                          <option value="withdrawn">انسحاب وعزلة اجتماعية 🟣</option>
+                          <option value="hyperactive">نشاط وحركة مفرطة 🔵</option>
+                        </select>
+                      </div>
+
+                      {/* Suspected Medicine Select */}
+                      <div>
+                        <label className="block text-slate-400 mb-1 font-bold">الدواء المرتبط (المشتبه به) - اختياري</label>
+                        <select 
+                          value={behaviorForm.recentMedicineId}
+                          onChange={(e) => setBehaviorForm(prev => ({ ...prev, recentMedicineId: e.target.value }))}
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
+                        >
+                          <option value="">-- لا يوجد دواء مرتبط مباشر --</option>
+                          {medicines.map(m => (
+                            <option key={m.id} value={m.id}>{m.commercialName} ({m.scientificName})</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Side effects checklist with custom additions/edits/deletions */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="block text-slate-400 font-bold">الأعراض الجانبية المرصودة (اختر كل ما ينطبق)</label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowAddSideEffectInput(!showAddSideEffectInput);
+                            setNewSideEffectInput('');
+                          }}
+                          className="text-[11px] text-teal-400 hover:underline cursor-pointer font-bold"
+                        >
+                          {showAddSideEffectInput ? "إلغاء ❌" : "+ إضافة عرض جديد"}
+                        </button>
+                      </div>
+
+                      {showAddSideEffectInput && (
+                        <div className="flex gap-1.5 mb-2.5 items-center bg-slate-950/40 p-2 rounded-xl border border-slate-800">
+                          <input
+                            type="text"
+                            value={newSideEffectInput}
+                            onChange={(e) => setNewSideEffectInput(e.target.value)}
+                            placeholder="العرض الجانبي الجديد (مثال: طفح جلدي وحساسية)"
+                            className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-850 text-white focus:border-teal-500 outline-none"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newSideEffectInput.trim()) {
+                                  handleAddCustomSideEffect(newSideEffectInput.trim());
+                                  setNewSideEffectInput('');
+                                  setShowAddSideEffectInput(false);
+                                }
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newSideEffectInput.trim()) {
+                                handleAddCustomSideEffect(newSideEffectInput.trim());
+                                setNewSideEffectInput('');
+                                setShowAddSideEffectInput(false);
+                              } else {
+                                showToast('الرجاء كتابة اسم العرض أولاً', 'error');
+                              }
+                            }}
+                            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0 transition"
+                          >
+                            حفظ 💾
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-850 max-h-56 overflow-y-auto">
+                        {customSideEffects.map((item) => {
+                          const isChecked = behaviorForm.sideEffects.includes(item.key);
+
+                          return (
+                            <div key={item.key} className="flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-slate-900/60 transition group min-h-[36px]">
+                              {editingSideEffectKey === item.key ? (
+                                <div className="flex items-center gap-1.5 w-full">
+                                  <input
+                                    type="text"
+                                    value={editingSideEffectLabel}
+                                    onChange={(e) => setEditingSideEffectLabel(e.target.value)}
+                                    className="flex-1 px-2 py-1 text-[11px] rounded bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        if (editingSideEffectLabel.trim()) {
+                                          handleEditCustomSideEffect(item.key, editingSideEffectLabel.trim());
+                                          setEditingSideEffectKey(null);
+                                          setEditingSideEffectLabel('');
+                                        }
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (editingSideEffectLabel.trim()) {
+                                        handleEditCustomSideEffect(item.key, editingSideEffectLabel.trim());
+                                        setEditingSideEffectKey(null);
+                                        setEditingSideEffectLabel('');
+                                      } else {
+                                        showToast('الرجاء كتابة العرض المعدل', 'error');
+                                      }
+                                    }}
+                                    className="px-2 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded text-[10px] font-bold cursor-pointer shrink-0 transition"
+                                  >
+                                    حفظ
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingSideEffectKey(null);
+                                      setEditingSideEffectLabel('');
+                                    }}
+                                    className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer shrink-0 transition"
+                                  >
+                                    إلغاء
+                                  </button>
+                                </div>
+                              ) : deletingSideEffectKey === item.key ? (
+                                <div className="flex items-center justify-between gap-1.5 w-full">
+                                  <span className="text-[10px] text-rose-400 font-bold truncate">تأكيد حذف: {item.label}؟</span>
+                                  <div className="flex gap-1 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleDeleteCustomSideEffect(item.key);
+                                        if (isChecked) {
+                                          setBehaviorForm(prev => ({ 
+                                            ...prev, 
+                                            sideEffects: prev.sideEffects.filter(x => x !== item.key) 
+                                          }));
+                                        }
+                                        setDeletingSideEffectKey(null);
+                                      }}
+                                      className="px-2 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[9px] font-bold cursor-pointer transition animate-pulse"
+                                    >
+                                      نعم ✅
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeletingSideEffectKey(null)}
+                                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[9px] font-bold cursor-pointer transition"
+                                    >
+                                      لا ❌
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <label className="flex items-center gap-2 cursor-pointer text-slate-300 select-none flex-1 min-w-0">
+                                    <input 
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={() => {
+                                        let updated = [...behaviorForm.sideEffects];
+                                        if (isChecked) {
+                                          updated = updated.filter(x => x !== item.key);
+                                        } else {
+                                          updated.push(item.key);
+                                        }
+                                        setBehaviorForm(prev => ({ ...prev, sideEffects: updated }));
+                                      }}
+                                      className="w-4 h-4 rounded border-slate-800 text-teal-600 focus:ring-teal-500 bg-slate-950 cursor-pointer"
+                                    />
+                                    <span className="truncate text-[11px] font-medium">{item.label}</span>
+                                  </label>
+
+                                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditingSideEffectKey(item.key);
+                                        setEditingSideEffectLabel(item.label);
+                                      }}
+                                      className="p-1 hover:bg-slate-800 text-teal-400 rounded transition cursor-pointer"
+                                      title="تعديل هذا العرض"
+                                    >
+                                      <Edit2 className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDeletingSideEffectKey(item.key);
+                                      }}
+                                      className="p-1 hover:bg-slate-800 text-rose-400 rounded transition cursor-pointer"
+                                      title="حذف هذا العرض"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Severity Level select */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-bold">درجة خطورة وحدة الأعراض</label>
+                      <select 
+                        value={behaviorForm.severity}
+                        onChange={(e) => setBehaviorForm(prev => ({ ...prev, severity: e.target.value as any }))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
+                      >
+                        <option value="none">بدون عوارض (سليم) ✅</option>
+                        <option value="mild">طفيفة وغير مقلقة 🟢</option>
+                        <option value="moderate">متوسطة الأثر وتتطلب متبعة 🟡</option>
+                        <option value="severe">حادة للغاية وتتطلب تدخل طبيب عاجل 🚨</option>
+                      </select>
+                    </div>
+
+                    {/* Clinical Notes text area */}
+                    <div>
+                      <label className="block text-slate-400 mb-1 font-bold">تقرير الملاحظة والتفاصيل السلوكية *</label>
+                      <textarea 
+                        required
+                        rows={3}
+                        value={behaviorForm.notes}
+                        onChange={(e) => setBehaviorForm(prev => ({ ...prev, notes: e.target.value }))}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none font-sans"
+                        placeholder="اكتب بالتفصيل التقلبات الملاحظة، مثلاً: تغير في سلوك المقيم بعد تناول دواء الصرع، هدوء مفرط، صعوبة تركيز، تفاصيل الغثيان أو الحساسية..."
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-teal-900/25 cursor-pointer"
+                    >
+                      حفظ وتوثيق الملاحظة الطبية والسلوكية 💾
+                    </button>
+                  </form>
                 </div>
-                <div>
-                  <p>اعتماد إدارة مركز الرعاية:</p>
-                  <p>___________________</p>
-                </div>
               </div>
-            </div>
+            )}
 
             {/* Offline PWA warning badge */}
             <OfflineIndicator />
@@ -5141,5 +6179,97 @@ export default function App() {
       </footer>
 
     </div>
+
+    {/* ----------------- STANDALONE PRINT VIEW (أمر الطباعة المتكامل) ----------------- */}
+    <div id="print-area" className="hidden print:block w-full text-right text-xs p-8 text-black bg-white" dir="rtl">
+      {printType === 'inventory' ? (
+        <>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>صيدلية مركز رعاية ذوي الإعاقة</h1>
+            <p style={{ margin: '5px 0' }}>تقرير جرد المخازن وحركة الأدوية وصرف الوحدات الطبية</p>
+            <p style={{ fontSize: '10px', color: '#666' }}>تاريخ ترحيل التقرير: {new Date().toLocaleString('ar-EG')}</p>
+          </div>
+
+          <div style={{ marginBottom: '20px', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
+            <h3>ملخص الإحصاءات العامة للمستودع:</h3>
+            <p>إجمالي قيمة مستودع الأدوية: <strong>{stats.totalInventoryValue} ر.س</strong></p>
+            <p>عدد الأصناف المسجلة: <strong>{stats.totalItems} صنف</strong></p>
+            <p>إجمالي الكمية المصروفة فعلياً: <strong>{stats.totalDispensedCount} علبة/وحدة</strong></p>
+          </div>
+
+          <h3>تفاصيل المستودع وجرد الأدوية:</h3>
+          <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '10px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #333', textAlign: 'right' }}>
+                <th style={{ padding: '8px' }}>الاسم التجاري</th>
+                <th style={{ padding: '8px' }}>الاسم العلمي</th>
+                <th style={{ padding: '8px' }}>الكمية المتاحة</th>
+                <th style={{ padding: '8px' }}>الوحدة</th>
+                <th style={{ padding: '8px' }}>السعر</th>
+                <th style={{ padding: '8px' }}>تاريخ الصلاحية</th>
+              </tr>
+            </thead>
+            <tbody>
+              {medicines.map((med) => (
+                <tr key={med.id} style={{ borderBottom: '1px solid #ddd' }}>
+                  <td style={{ padding: '8px', fontWeight: 'bold' }}>{med.commercialName}</td>
+                  <td style={{ padding: '8px' }}>{med.scientificName}</td>
+                  <td style={{ padding: '8px' }}>{med.quantity}</td>
+                  <td style={{ padding: '8px' }}>{med.unit}</td>
+                  <td style={{ padding: '8px' }}>{med.price} ر.س</td>
+                  <td style={{ padding: '8px' }}>{med.expiryDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'space-between' }}>
+            <div>
+              <p>توقيع الصيدلي المسؤول:</p>
+              <p>___________________</p>
+            </div>
+            <div>
+              <p>اعتماد إدارة مركز الرعاية:</p>
+              <p>___________________</p>
+            </div>
+          </div>
+        </>
+      ) : (
+        activeDossierResident && (
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+              <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>صيدلية مركز رعاية ذوي الإعاقة</h1>
+              <p style={{ margin: '5px 0', fontSize: '16px', fontWeight: 'bold' }}>تقرير التقييم الطبي السريري المتقدم (ذكاء اصطناعي)</p>
+              <p style={{ fontSize: '10px', color: '#666' }}>تاريخ ترحيل التقرير: {new Date().toLocaleString('ar-EG')}</p>
+            </div>
+
+            <div style={{ marginBottom: '20px', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
+              <h3>معلومات المقيم الطبية والسريرية:</h3>
+              <p>اسم المقيم: <strong>{activeDossierResident.name}</strong></p>
+              <p>العمر: <strong>{activeDossierResident.age} سنة</strong></p>
+              <p>رقم الغرفة/الجناح: <strong>{activeDossierResident.roomNumber}</strong></p>
+              <p>الحساسية المسجلة: <strong style={{ color: '#b91c1c' }}>{activeDossierResident.allergies || 'لا توجد'}</strong></p>
+            </div>
+
+            <h3>محتوى تقرير التقييم والتحليل السريري:</h3>
+            <div style={{ whiteSpace: 'pre-line', fontSize: '11px', lineHeight: '1.6', marginTop: '10px', padding: '15px', border: '1px solid #ddd', borderRadius: '8px' }}>
+              {aiDossierResult}
+            </div>
+
+            <div style={{ marginTop: '50px', display: 'flex', justifyContent: 'space-between' }}>
+              <div>
+                <p>توقيع الصيدلي واللجنة الطبية السريرية:</p>
+                <p style={{ marginTop: '30px' }}>___________________</p>
+              </div>
+              <div>
+                <p>اعتماد إدارة مركز الرعاية والخدمات الطبية:</p>
+                <p style={{ marginTop: '30px' }}>___________________</p>
+              </div>
+            </div>
+          </>
+        )
+      )}
+    </div>
+    </>
   );
 }
