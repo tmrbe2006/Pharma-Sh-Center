@@ -712,5 +712,131 @@ export const DbService = {
     list.unshift(newLog);
     saveLocalStockLogs(list);
     return newLog;
+  },
+
+  // --- Users CRUD ---
+  async fetchUsers(): Promise<any[]> {
+    const DEFAULT_USERS = [
+      {
+        uid: "user-101",
+        name: "د. طارق اليوسف",
+        email: "yousef.t@carecenter.org",
+        role: "admin",
+        phone: "+966501234567",
+        password: "admin"
+      },
+      {
+        uid: "user-102",
+        name: "صيدلي. كريم القحطاني",
+        email: "kareem.q@carecenter.org",
+        role: "pharmacist",
+        phone: "+966507654321",
+        password: "pharm"
+      },
+      {
+        uid: "user-103",
+        name: "فني. ماجد الرويلي",
+        email: "majed.r@carecenter.org",
+        role: "technician",
+        phone: "+966509998887",
+        password: "tech"
+      }
+    ];
+
+    try {
+      if (isFirebaseConnected) {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        if (!querySnapshot.empty) {
+          const list: any[] = [];
+          querySnapshot.forEach((doc) => {
+            list.push({ uid: doc.id, ...doc.data() });
+          });
+          localStorage.setItem('care_pharmacy_all_users', JSON.stringify(list));
+          return list;
+        } else {
+          // Seed initial users into Firestore
+          for (const u of DEFAULT_USERS) {
+            await setDoc(doc(db, "users", u.uid), {
+              name: u.name,
+              email: u.email,
+              role: u.role,
+              phone: u.phone,
+              password: u.password
+            });
+          }
+          localStorage.setItem('care_pharmacy_all_users', JSON.stringify(DEFAULT_USERS));
+          return DEFAULT_USERS;
+        }
+      }
+    } catch (e) {
+      console.warn("Firestore fetchUsers failed, returning local storage:", e);
+    }
+    
+    const saved = localStorage.getItem('care_pharmacy_all_users');
+    return saved ? JSON.parse(saved) : DEFAULT_USERS;
+  },
+
+  async addUser(newUser: any): Promise<any> {
+    const userWithId = {
+      ...newUser,
+      uid: newUser.uid || "user-" + Math.random().toString(36).substr(2, 9)
+    };
+
+    try {
+      if (isFirebaseConnected) {
+        await setDoc(doc(db, "users", userWithId.uid), {
+          name: userWithId.name,
+          email: userWithId.email,
+          role: userWithId.role,
+          phone: userWithId.phone,
+          password: userWithId.password
+        });
+      }
+    } catch (e) {
+      console.warn("Firestore addUser failed, saving locally:", e);
+    }
+
+    const saved = localStorage.getItem('care_pharmacy_all_users');
+    const list = saved ? JSON.parse(saved) : [];
+    list.push(userWithId);
+    localStorage.setItem('care_pharmacy_all_users', JSON.stringify(list));
+    return userWithId;
+  },
+
+  async updateUser(updatedUser: any): Promise<any> {
+    try {
+      if (isFirebaseConnected) {
+        await setDoc(doc(db, "users", updatedUser.uid), {
+          name: updatedUser.name,
+          email: updatedUser.email,
+          role: updatedUser.role,
+          phone: updatedUser.phone,
+          password: updatedUser.password
+        }, { merge: true });
+      }
+    } catch (e) {
+      console.warn("Firestore updateUser failed, saving locally:", e);
+    }
+
+    const saved = localStorage.getItem('care_pharmacy_all_users');
+    let list = saved ? JSON.parse(saved) : [];
+    list = list.map((u: any) => u.uid === updatedUser.uid ? updatedUser : u);
+    localStorage.setItem('care_pharmacy_all_users', JSON.stringify(list));
+    return updatedUser;
+  },
+
+  async deleteUser(userId: string): Promise<void> {
+    try {
+      if (isFirebaseConnected) {
+        await deleteDoc(doc(db, "users", userId));
+      }
+    } catch (e) {
+      console.warn("Firestore deleteUser failed, saving locally:", e);
+    }
+
+    const saved = localStorage.getItem('care_pharmacy_all_users');
+    let list = saved ? JSON.parse(saved) : [];
+    list = list.filter((u: any) => u.uid !== userId);
+    localStorage.setItem('care_pharmacy_all_users', JSON.stringify(list));
   }
 };

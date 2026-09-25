@@ -1,5 +1,263 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   THEME SKINS ENGINE FOR CARE PHARMACY
+   ========================================================================== */
+
+/* 1. Midnight Emerald (Default Signature Dark) */
+.skin-midnight, [data-skin="midnight"] {
+  --color-slate-950: #030712;
+  --color-slate-900: #0f172a;
+  --color-slate-800: #1e293b;
+  --color-slate-700: #334155;
+  --color-teal-600: #0d9488;
+  --color-teal-500: #14b8a6;
+  --color-teal-400: #2dd4bf;
+  --color-teal-300: #5eead4;
+  --color-teal-700: #0f766e;
+  --color-teal-900: #134e4a;
+
+  --skin-bg: #030712;
+  --skin-header: rgba(15, 23, 42, 0.95);
+  --skin-card: rgba(15, 23, 42, 0.72);
+  --skin-card-solid: #0f172a;
+  --skin-border: #1e293b;
+  --skin-accent: #0d9488;
+  --skin-accent-hover: #0f766e;
+  --skin-accent-light: rgba(13, 148, 136, 0.15);
+  --skin-accent-glow: rgba(13, 148, 136, 0.35);
+  --skin-text-accent: #2dd4bf;
+}
+
+/* 2. Royal Navy & Gold (Imperial Sapphire Dark) */
+.skin-royal-navy, [data-skin="royal-navy"] {
+  --color-slate-950: #020817;
+  --color-slate-900: #0a1835;
+  --color-slate-800: #1e3a8a;
+  --color-slate-700: #2563eb;
+  --color-teal-600: #d97706;
+  --color-teal-500: #f59e0b;
+  --color-teal-400: #fbbf24;
+  --color-teal-300: #fcd34d;
+  --color-teal-700: #b45309;
+  --color-teal-900: #78350f;
+
+  --skin-bg: #020817;
+  --skin-header: rgba(10, 24, 53, 0.95);
+  --skin-card: rgba(10, 24, 53, 0.75);
+  --skin-card-solid: #0a1835;
+  --skin-border: #1e3a8a;
+  --skin-accent: #f59e0b;
+  --skin-accent-hover: #d97706;
+  --skin-accent-light: rgba(245, 158, 11, 0.16);
+  --skin-accent-glow: rgba(245, 158, 11, 0.35);
+  --skin-text-accent: #fbbf24;
+}
+
+/* 3. Forest Mint & Emerald (Apothecary Botanical Dark) */
+.skin-forest-emerald, [data-skin="forest-emerald"] {
+  --color-slate-950: #01140f;
+  --color-slate-900: #03271c;
+  --color-slate-800: #065f46;
+  --color-slate-700: #047857;
+  --color-teal-600: #059669;
+  --color-teal-500: #10b981;
+  --color-teal-400: #34d399;
+  --color-teal-300: #6ee7b7;
+  --color-teal-700: #047857;
+  --color-teal-900: #064e3b;
+
+  --skin-bg: #01140f;
+  --skin-header: rgba(3, 39, 28, 0.95);
+  --skin-card: rgba(3, 39, 28, 0.75);
+  --skin-card-solid: #03271c;
+  --skin-border: #065f46;
+  --skin-accent: #10b981;
+  --skin-accent-hover: #059669;
+  --skin-accent-light: rgba(16, 185, 129, 0.16);
+  --skin-accent-glow: rgba(16, 185, 129, 0.35);
+  --skin-text-accent: #34d399;
+}
+
+/* 4. Modern Amethyst Neuro (Psychological & Behavioral Dark) */
+.skin-amethyst, [data-skin="amethyst"] {
+  --color-slate-950: #090314;
+  --color-slate-900: #1c0a32;
+  --color-slate-800: #581c87;
+  --color-slate-700: #7e22ce;
+  --color-teal-600: #9333ea;
+  --color-teal-500: #a855f7;
+  --color-teal-400: #c084fc;
+  --color-teal-300: #d8b4fe;
+  --color-teal-700: #7e22ce;
+  --color-teal-900: #3b0764;
+
+  --skin-bg: #090314;
+  --skin-header: rgba(28, 10, 50, 0.95);
+  --skin-card: rgba(28, 10, 50, 0.75);
+  --skin-card-solid: #1c0a32;
+  --skin-border: #581c87;
+  --skin-accent: #a855f7;
+  --skin-accent-hover: #9333ea;
+  --skin-accent-light: rgba(168, 85, 247, 0.18);
+  --skin-accent-glow: rgba(168, 85, 247, 0.35);
+  --skin-text-accent: #c084fc;
+}
+
+/* 5. Minimalist Charcoal & Steel Ice (Modern Graphite Dark) */
+.skin-slate-minimal, [data-skin="slate-minimal"] {
+  --color-slate-950: #09090b;
+  --color-slate-900: #18181b;
+  --color-slate-800: #3f3f46;
+  --color-slate-700: #52525b;
+  --color-teal-600: #0284c7;
+  --color-teal-500: #0ea5e9;
+  --color-teal-400: #38bdf8;
+  --color-teal-300: #7dd3fc;
+  --color-teal-700: #0369a1;
+  --color-teal-900: #0c4a6e;
+
+  --skin-bg: #09090b;
+  --skin-header: rgba(24, 24, 27, 0.95);
+  --skin-card: rgba(28, 28, 32, 0.8);
+  --skin-card-solid: #18181b;
+  --skin-border: #3f3f46;
+  --skin-accent: #0ea5e9;
+  --skin-accent-hover: #0284c7;
+  --skin-accent-light: rgba(14, 165, 233, 0.16);
+  --skin-accent-glow: rgba(14, 165, 233, 0.35);
+  --skin-text-accent: #38bdf8;
+}
+
+/* 6. Clinical Daylight (Pure White Light Mode) */
+.skin-clinical-light, [data-skin="clinical-light"] {
+  --color-slate-950: #f8fafc;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #e2e8f0;
+  --color-slate-700: #cbd5e1;
+  --color-teal-600: #0284c7;
+  --color-teal-500: #0ea5e9;
+  --color-teal-400: #0284c7;
+  --color-teal-300: #0369a1;
+  --color-teal-700: #0369a1;
+  --color-teal-900: #075985;
+
+  --skin-bg: #f8fafc;
+  --skin-header: rgba(255, 255, 255, 0.96);
+  --skin-card: #ffffff;
+  --skin-card-solid: #ffffff;
+  --skin-border: #e2e8f0;
+  --skin-accent: #0284c7;
+  --skin-accent-hover: #0369a1;
+  --skin-accent-light: rgba(2, 132, 199, 0.1);
+  --skin-accent-glow: rgba(2, 132, 199, 0.25);
+  --skin-text-accent: #0284c7;
+}
+
+/* ==========================================================================
+   DIRECT COMPONENT OVERRIDES PER ACTIVE SKIN
+   ========================================================================== */
+
+/* Main canvas background */
+[class*="skin-"] {
+  background-color: var(--skin-bg) !important;
+}
+
+/* Top Navigation Header */
+[class*="skin-"] header {
+  background-color: var(--skin-header) !important;
+  border-color: var(--skin-border) !important;
+}
+
+/* Cards, widgets & content containers */
+[class*="skin-"] .bg-slate-900\/50,
+[class*="skin-"] .bg-slate-900\/40,
+[class*="skin-"] .bg-slate-900\/60,
+[class*="skin-"] .bg-slate-900\/30,
+[class*="skin-"] .bg-slate-900\/25,
+[class*="skin-"] .bg-slate-900\/20,
+[class*="skin-"] .bg-slate-900\/80,
+[class*="skin-"] .bg-slate-900\/90,
+[class*="skin-"] .bg-slate-900\/95 {
+  background-color: var(--skin-card) !important;
+  border-color: var(--skin-border) !important;
+}
+
+[class*="skin-"] .bg-slate-900 {
+  background-color: var(--skin-card-solid) !important;
+  border-color: var(--skin-border) !important;
+}
+
+/* Inner containers & form fields */
+[class*="skin-"] .bg-slate-950 {
+  background-color: var(--skin-bg) !important;
+  border-color: var(--skin-border) !important;
+}
+
+[class*="skin-"] .bg-slate-950\/40,
+[class*="skin-"] .bg-slate-950\/60,
+[class*="skin-"] .bg-slate-950\/50,
+[class*="skin-"] .bg-slate-950\/30,
+[class*="skin-"] .bg-slate-950\/20 {
+  background-color: rgba(0, 0, 0, 0.35) !important;
+  border-color: var(--skin-border) !important;
+}
+
+/* Global borders */
+[class*="skin-"] .border-slate-800,
+[class*="skin-"] .border-slate-850,
+[class*="skin-"] .border-slate-800\/60,
+[class*="skin-"] .border-slate-800\/50 {
+  border-color: var(--skin-border) !important;
+}
+
+/* Interactive primary buttons */
+[class*="skin-"] .bg-teal-600 {
+  background-color: var(--skin-accent) !important;
+  color: #ffffff !important;
+}
+
+[class*="skin-"] .bg-teal-600:hover,
+[class*="skin-"] .hover\:bg-teal-500:hover,
+[class*="skin-"] .hover\:bg-teal-600:hover {
+  background-color: var(--skin-accent-hover) !important;
+}
+
+/* Accent texts, icons, badges & highlights */
+[class*="skin-"] .text-teal-400,
+[class*="skin-"] .text-teal-500,
+[class*="skin-"] .text-teal-300 {
+  color: var(--skin-text-accent) !important;
+}
+
+[class*="skin-"] .border-teal-500,
+[class*="skin-"] .border-teal-500\/40,
+[class*="skin-"] .border-teal-500\/20,
+[class*="skin-"] .border-teal-500\/30 {
+  border-color: var(--skin-accent) !important;
+}
+
+[class*="skin-"] .bg-teal-500\/10,
+[class*="skin-"] .bg-teal-600\/10,
+[class*="skin-"] .bg-teal-500\/20 {
+  background-color: var(--skin-accent-light) !important;
+  color: var(--skin-text-accent) !important;
+}
+
+/* Soft accent shadows */
+[class*="skin-"] .shadow-teal-900\/25,
+[class*="skin-"] .shadow-teal-900\/40 {
+  box-shadow: 0 10px 25px -5px var(--skin-accent-glow) !important;
+}
+
+/* Form input focus border */
+[class*="skin-"] .focus\:border-teal-500:focus,
+[class*="skin-"] input:focus,
+[class*="skin-"] select:focus,
+[class*="skin-"] textarea:focus {
+  border-color: var(--skin-accent) !important;
+}
+
 @media print {
   /* Override backgrounds and colors for perfect high-contrast paper print */
   html, body {

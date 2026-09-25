@@ -12,6 +12,7 @@ import {
 import { DbService, Medicine, DispenseRecord, UserSession, StockAuditLog } from './db/mockDb';
 import { PWAInstallButton } from './PWAInstallButton';
 import { OfflineIndicator } from './OfflineIndicator';
+import { localizationData, Language } from './db/localization';
 
 // User roles and permission matrix
 interface RoleConfig {
@@ -34,6 +35,110 @@ const ROLES: Record<string, RoleConfig> = {
   }
 };
 
+export type SkinId = 'midnight' | 'clinical-light' | 'royal-navy' | 'forest-emerald' | 'amethyst' | 'slate-minimal';
+
+interface SkinOption {
+  id: SkinId;
+  nameAr: string;
+  nameEn: string;
+  descAr: string;
+  descEn: string;
+  isDark: boolean;
+  primaryColor: string;
+  bgColor: string;
+  cardColor: string;
+  borderColor: string;
+  previewBg: string;
+  badgeClass: string;
+}
+
+const SKINS: SkinOption[] = [
+  {
+    id: 'midnight',
+    nameAr: 'كحلي زمردي ليلي (Midnight)',
+    nameEn: 'Midnight Emerald (Default)',
+    descAr: 'المظهر الافتراضي الفخم عالي التباين للصيدلية',
+    descEn: 'Signature high-contrast executive dark theme',
+    isDark: true,
+    primaryColor: '#0d9488',
+    bgColor: '#030712',
+    cardColor: '#0f172a',
+    borderColor: '#1e293b',
+    previewBg: 'bg-slate-950 border-teal-500/40',
+    badgeClass: 'bg-teal-500/20 text-teal-300'
+  },
+  {
+    id: 'clinical-light',
+    nameAr: 'أبيض سريري ناصع (Daylight)',
+    nameEn: 'Clinical Daylight (Pure White)',
+    descAr: 'مظهر نهاري سريري فائق الوضوح ومريح للقراءة',
+    descEn: 'Ultra-crisp hospital daylight theme for daytime shifts',
+    isDark: false,
+    primaryColor: '#0284c7',
+    bgColor: '#f8fafc',
+    cardColor: '#ffffff',
+    borderColor: '#e2e8f0',
+    previewBg: 'bg-slate-50 border-sky-400',
+    badgeClass: 'bg-sky-500/20 text-sky-700'
+  },
+  {
+    id: 'royal-navy',
+    nameAr: 'كحلي ملكي وذهبي (Royal Navy)',
+    nameEn: 'Royal Navy & Gold',
+    descAr: 'أزرق ملكي داكن بلمسات ذهبية للإدارة العليا',
+    descEn: 'Deep sapphire navy with warm golden accents',
+    isDark: true,
+    primaryColor: '#f59e0b',
+    bgColor: '#020817',
+    cardColor: '#0a1835',
+    borderColor: '#1e3a8a',
+    previewBg: 'bg-[#050c1f] border-amber-500/40',
+    badgeClass: 'bg-amber-500/20 text-amber-300'
+  },
+  {
+    id: 'forest-emerald',
+    nameAr: 'أخضر زمردي صحي (Forest Mint)',
+    nameEn: 'Botanical Forest Mint',
+    descAr: 'أجواء صيدلانية نباتية هادئة ومريحة للعين',
+    descEn: 'Soothing apothecary emerald atmosphere',
+    isDark: true,
+    primaryColor: '#10b981',
+    bgColor: '#01140f',
+    cardColor: '#03271c',
+    borderColor: '#065f46',
+    previewBg: 'bg-[#021a14] border-emerald-500/40',
+    badgeClass: 'bg-emerald-500/20 text-emerald-300'
+  },
+  {
+    id: 'amethyst',
+    nameAr: 'أرجواني نفسي حديث (Amethyst)',
+    nameEn: 'Modern Amethyst Neuro',
+    descAr: 'طابع بنفسجي دافئ ملائم لعيادات السلوك والنفسية',
+    descEn: 'Warm violet tone ideal for behavioral clinics',
+    isDark: true,
+    primaryColor: '#a855f7',
+    bgColor: '#090314',
+    cardColor: '#1c0a32',
+    borderColor: '#581c87',
+    previewBg: 'bg-[#0b0816] border-purple-500/40',
+    badgeClass: 'bg-purple-500/20 text-purple-300'
+  },
+  {
+    id: 'slate-minimal',
+    nameAr: 'فحمي فولاذي عصري (Charcoal)',
+    nameEn: 'Charcoal & Steel Ice',
+    descAr: 'مظهر داكن عصري بدرجات الرمادي الفولاذي والأزرق الثلجي',
+    descEn: 'Clean minimalist dark steel with cool ice-blue accents',
+    isDark: true,
+    primaryColor: '#0ea5e9',
+    bgColor: '#09090b',
+    cardColor: '#18181b',
+    borderColor: '#3f3f46',
+    previewBg: 'bg-[#09090b] border-zinc-700',
+    badgeClass: 'bg-sky-500/20 text-sky-300'
+  }
+];
+
 export default function App() {
   // Global State
   const [medicines, setMedicines] = useState<Medicine[]>([]);
@@ -43,6 +148,47 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [darkMode, setDarkMode] = useState(true);
+  const [skin, setSkin] = useState<SkinId>(() => {
+    try {
+      const saved = localStorage.getItem('care_pharmacy_skin');
+      return (saved as SkinId) || 'midnight';
+    } catch {
+      return 'midnight';
+    }
+  });
+  const [showSkinModal, setShowSkinModal] = useState(false);
+  const [lang, setLang] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem('care_pharmacy_lang');
+      return (saved as Language) || 'ar';
+    } catch {
+      return 'ar';
+    }
+  });
+
+  const handleSelectSkin = (selectedSkinId: SkinId) => {
+    setSkin(selectedSkinId);
+    localStorage.setItem('care_pharmacy_skin', selectedSkinId);
+    const targetConfig = SKINS.find(s => s.id === selectedSkinId);
+    if (targetConfig) {
+      setDarkMode(targetConfig.isDark);
+    }
+    setShowSkinModal(false);
+    showToast(
+      lang === 'ar' 
+        ? `تم تطبيق مظهر "${SKINS.find(s => s.id === selectedSkinId)?.nameAr}" بنجاح 🎨` 
+        : `Theme skin "${SKINS.find(s => s.id === selectedSkinId)?.nameEn}" applied! 🎨`, 
+      'success'
+    );
+  };
+
+  const t = (key: keyof typeof localizationData.ar) => {
+    return localizationData[lang][key] || localizationData.ar[key] || '';
+  };
+
+  const text = (ar: string, en: string) => {
+    return lang === 'ar' ? ar : en;
+  };
 
   // Care Center Residents State with localStorage persistence
   const [residents, setResidents] = useState<any[]>(() => {
@@ -547,7 +693,7 @@ export default function App() {
     const updated = [...customSideEffects, { key, label: cleaned }];
     setCustomSideEffects(updated);
     localStorage.setItem('care_pharmacy_custom_side_effects', JSON.stringify(updated));
-    showToast(`تمت إضافة العرض الجانبي: ${cleaned}`, 'success');
+    showToast(text(`تمت إضافة العرض الجانبي: ${cleaned}`, `Side effect added: ${cleaned}`), 'success');
   };
 
   const handleEditCustomSideEffect = (key: string, newLabel: string) => {
@@ -556,14 +702,14 @@ export default function App() {
     const updated = customSideEffects.map(se => se.key === key ? { ...se, label: cleaned } : se);
     setCustomSideEffects(updated);
     localStorage.setItem('care_pharmacy_custom_side_effects', JSON.stringify(updated));
-    showToast(`تم تعديل العرض الجانبي بنجاح`, 'success');
+    showToast(text('تم تعديل العرض الجانبي بنجاح', 'Side effect updated successfully'), 'success');
   };
 
   const handleDeleteCustomSideEffect = (key: string) => {
     const updated = customSideEffects.filter(se => se.key !== key);
     setCustomSideEffects(updated);
     localStorage.setItem('care_pharmacy_custom_side_effects', JSON.stringify(updated));
-    showToast(`تم حذف العرض الجانبي`, 'success');
+    showToast(text('تم حذف العرض الجانبي', 'Side effect deleted successfully'), 'success');
   };
 
   // Load Data
@@ -574,10 +720,12 @@ export default function App() {
       const disp = await DbService.fetchDispenseRecords();
       const sess = await DbService.fetchSessions();
       const logs = await DbService.fetchStockLogs();
+      const loadedUsers = await DbService.fetchUsers();
       setMedicines(meds);
       setDispenseRecords(disp);
       setSessions(sess);
       setStockLogs(logs);
+      setUsers(loadedUsers);
     } catch (e: any) {
       showToast('خطأ أثناء تحميل البيانات من الخادم، تم تنشيط قاعدة البيانات الاحتياطية', 'error');
     } finally {
@@ -738,13 +886,13 @@ export default function App() {
     e.preventDefault();
     try {
       if (!behaviorForm.residentId) {
-        showToast('يرجى اختيار المقيم أولاً', 'error');
+        showToast(text('يرجى اختيار المقيم أولاً', 'Please select a resident first'), 'error');
         return;
       }
       
       const res = residents.find(r => r.id === behaviorForm.residentId);
       if (!res) {
-        showToast('المقيم غير موجود', 'error');
+        showToast(text('المقيم غير موجود', 'Resident not found'), 'error');
         return;
       }
 
@@ -775,7 +923,7 @@ export default function App() {
         updateBehaviorLogs(updatedLogs);
         setShowAddBehaviorModal(false);
         setSelectedBehaviorLogId(null);
-        showToast(`تم تعديل الملاحظة السلوكية بنجاح للمقيم: ${res.name}`, 'success');
+        showToast(text(`تم تعديل الملاحظة السلوكية بنجاح للمقيم: ${res.name}`, `Behavioral observation updated successfully for: ${res.name}`), 'success');
       } else {
         // Creating new log
         const newLog = {
@@ -783,7 +931,7 @@ export default function App() {
           residentId: behaviorForm.residentId,
           residentName: res.name,
           loggedAt: new Date().toISOString(),
-          loggedBy: currentUser?.name || 'مستخدم مجهول',
+          loggedBy: currentUser?.name || text('مستخدم مجهول', 'Staff Member'),
           behaviorRating: behaviorForm.behaviorRating,
           sideEffects: behaviorForm.sideEffects,
           severity: behaviorForm.severity,
@@ -795,7 +943,7 @@ export default function App() {
         const updated = [newLog, ...behaviorLogs];
         updateBehaviorLogs(updated);
         setShowAddBehaviorModal(false);
-        showToast(`تم تسجيل الملاحظة السلوكية بنجاح للمقيم: ${res.name}`, 'success');
+        showToast(text(`تم تسجيل الملاحظة السلوكية بنجاح للمقيم: ${res.name}`, `Behavioral observation logged successfully for: ${res.name}`), 'success');
       }
 
       // Reset Form
@@ -808,15 +956,15 @@ export default function App() {
         notes: ''
       });
     } catch (err) {
-      showToast('حدث خطأ أثناء تسجيل الملاحظة السلوكية', 'error');
+      showToast(text('حدث خطأ أثناء تسجيل الملاحظة السلوكية', 'Error recording behavioral observation'), 'error');
     }
   };
 
   const handleDeleteBehaviorLog = (id: string) => {
-    if (confirm('هل أنت متأكد من رغبتك في حذف هذا السجل السلوكي؟')) {
+    if (confirm(text('هل أنت متأكد من رغبتك في حذف هذا السجل السلوكي؟', 'Are you sure you want to delete this behavioral entry?'))) {
       const updated = behaviorLogs.filter(b => b.id !== id);
       updateBehaviorLogs(updated);
-      showToast('تم حذف السجل السلوكي بنجاح.', 'success');
+      showToast(text('تم حذف السجل السلوكي بنجاح.', 'Behavioral entry deleted successfully.'), 'success');
     }
   };
 
@@ -1730,11 +1878,11 @@ export default function App() {
       }
     });
     const labels: Record<string, string> = {
-      stable: 'مستقر 🟢',
-      agitated: 'هياج سلوكي 🔴',
-      anxious: 'قلق وتوتر 🟡',
-      withdrawn: 'انسحاب اجتماعي 🟣',
-      hyperactive: 'نشاط مفرط 🔵'
+      stable: text('مستقر 🟢', 'Stable 🟢'),
+      agitated: text('هياج سلوكي 🔴', 'Agitation 🔴'),
+      anxious: text('قلق وتوتر 🟡', 'Anxiety 🟡'),
+      withdrawn: text('انسحاب اجتماعي 🟣', 'Social Withdrawal 🟣'),
+      hyperactive: text('نشاط مفرط 🔵', 'Hyperactive 🔵')
     };
     const colors: Record<string, string> = {
       stable: '#10b981',
@@ -2026,16 +2174,31 @@ export default function App() {
 
   if (!currentUser) {
     return (
-      <div className={`min-h-screen w-full flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} dir="rtl">
+      <div className={`min-h-screen w-full flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200 ${darkMode ? 'bg-slate-950' : 'bg-slate-50'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
         <div className="absolute top-4 left-4 flex gap-2">
           {/* Dark Mode toggle in login */}
           <button 
             type="button"
             onClick={() => setDarkMode(!darkMode)}
             className={`p-2.5 rounded-xl border transition-all ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-amber-400' : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 shadow-sm'}`}
-            title={darkMode ? "الوضع النهاري" : "الوضع الليلي"}
+            title={darkMode ? (lang === 'ar' ? "الوضع النهاري" : "Light Mode") : (lang === 'ar' ? "الوضع الليلي" : "Dark Mode")}
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
+
+          {/* Language toggle in login */}
+          <button 
+            type="button"
+            onClick={() => {
+              const nextLang = lang === 'ar' ? 'en' : 'ar';
+              setLang(nextLang);
+              localStorage.setItem('care_pharmacy_lang', nextLang);
+              showToast(nextLang === 'ar' ? 'تم تحويل النظام بالكامل إلى اللغة العربية 🇸🇦' : 'System translated to English successfully! 🇺🇸', 'success');
+            }}
+            className={`px-3 py-2 rounded-xl border font-black text-xs transition-all flex items-center gap-1 cursor-pointer hover:scale-105 active:scale-95 ${darkMode ? 'border-slate-800 bg-slate-800/60 hover:bg-slate-800 text-teal-400' : 'border-slate-200 bg-white hover:bg-slate-100 text-teal-600 shadow-sm'}`}
+            title={lang === 'ar' ? "Switch to English 🇺🇸" : "التحويل للغة العربية 🇸🇦"}
+          >
+            <span>{lang === 'ar' ? "EN 🇬🇧" : "عربي 🇸🇦"}</span>
           </button>
         </div>
 
@@ -2045,9 +2208,9 @@ export default function App() {
             <div className="mx-auto h-16 w-16 bg-teal-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-teal-600/20 mb-4 animate-pulse">
               <Activity className="w-8 h-8" />
             </div>
-            <h2 className={`text-3xl font-black tracking-tight ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>صيدلية مركز الرعاية</h2>
+            <h2 className={`text-3xl font-black tracking-tight ${darkMode ? 'text-teal-400' : 'text-teal-600'}`}>{t('app_title')}</h2>
             <p className={`mt-2 text-xs font-semibold ${darkMode ? 'text-slate-400' : 'text-slate-600'}`}>
-              نظام إدارة أمن مخزن وصرف الأدوية لمقيمي مركز ذوي الإعاقة
+              {t('app_subtitle')}
             </p>
           </div>
 
@@ -2057,10 +2220,10 @@ export default function App() {
               {/* Email Input */}
               <div>
                 <label htmlFor="email" className={`block text-xs font-bold mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
-                  البريد الإلكتروني المهني
+                  {lang === 'ar' ? 'البريد الإلكتروني المهني' : 'Professional Email'}
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
+                  <div className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center pointer-events-none text-slate-500`}>
                     <Mail className="w-4 h-4" />
                   </div>
                   <input
@@ -2069,7 +2232,7 @@ export default function App() {
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    className={`w-full pr-10 pl-3 py-2.5 rounded-xl border text-xs outline-none transition-all ${
+                    className={`w-full ${lang === 'ar' ? 'pr-10 pl-3 text-right' : 'pl-10 pr-3 text-left'} py-2.5 rounded-xl border text-xs outline-none transition-all ${
                       darkMode 
                         ? 'bg-slate-950 border-slate-800 text-white focus:border-teal-500' 
                         : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-teal-500'
@@ -2082,10 +2245,10 @@ export default function App() {
               {/* Password Input */}
               <div>
                 <label htmlFor="password" className={`block text-xs font-bold mb-2 ${darkMode ? 'text-slate-400' : 'text-slate-700'}`}>
-                  كلمة المرور
+                  {lang === 'ar' ? 'كلمة المرور' : 'Password'}
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-500">
+                  <div className={`absolute inset-y-0 ${lang === 'ar' ? 'right-0 pr-3.5' : 'left-0 pl-3.5'} flex items-center pointer-events-none text-slate-500`}>
                     <Lock className="w-4 h-4" />
                   </div>
                   <input
@@ -2094,7 +2257,7 @@ export default function App() {
                     required
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    className={`w-full pr-10 pl-10 py-2.5 rounded-xl border text-xs outline-none transition-all ${
+                    className={`w-full ${lang === 'ar' ? 'pr-10 pl-10 text-right' : 'pl-10 pr-10 text-left'} py-2.5 rounded-xl border text-xs outline-none transition-all ${
                       darkMode 
                         ? 'bg-slate-950 border-slate-800 text-white focus:border-teal-500' 
                         : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-teal-500'
@@ -2104,7 +2267,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setLoginShowPassword(!loginShowPassword)}
-                    className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-500 hover:text-slate-300 cursor-pointer"
+                    className={`absolute inset-y-0 ${lang === 'ar' ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-slate-500 hover:text-slate-300 cursor-pointer`}
                   >
                     {loginShowPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -2120,9 +2283,13 @@ export default function App() {
                     onChange={(e) => setRememberMe(e.target.checked)}
                     className="rounded text-teal-600 focus:ring-teal-500 bg-slate-950 border-slate-800"
                   />
-                  <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>تذكرني في هذا الجهاز</span>
+                  <span className={darkMode ? 'text-slate-400' : 'text-slate-600'}>
+                    {lang === 'ar' ? 'تذكرني في هذا الجهاز' : 'Remember me on this device'}
+                  </span>
                 </label>
-                <span className="text-teal-500 hover:underline cursor-pointer">المساعدة والدعم</span>
+                <span className="text-teal-500 hover:underline cursor-pointer">
+                  {lang === 'ar' ? 'المساعدة والدعم' : 'Help & Support'}
+                </span>
               </div>
 
               {/* Submit Button */}
@@ -2131,7 +2298,7 @@ export default function App() {
                 className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-teal-900/20 text-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Shield className="w-4 h-4 shrink-0" />
-                <span>تسجيل الدخول الآمن</span>
+                <span>{lang === 'ar' ? 'تسجيل الدخول الآمن' : 'Secure Login'}</span>
               </button>
             </form>
           </div>
@@ -2140,7 +2307,11 @@ export default function App() {
           <div className="text-center text-[10px] text-slate-500 space-y-1">
             <p className="flex items-center justify-center gap-1">
               <Shield className="w-3 h-3 text-teal-500" />
-              <span>نظام مشفر وممتثل لمعايير الهيئة العامة للغذاء والدواء ووزارة الصحة السعودية</span>
+              <span>
+                {lang === 'ar' 
+                  ? 'نظام مشفر وممتثل لمعايير الهيئة العامة للغذاء والدواء ووزارة الصحة السعودية' 
+                  : 'Encrypted system compliant with SFDA and Saudi Ministry of Health guidelines'}
+              </span>
             </p>
           </div>
         </div>
@@ -2160,196 +2331,310 @@ export default function App() {
 
   return (
     <>
-    <div className={`min-h-screen transition-colors duration-200 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`} dir="rtl">
+    <div data-skin={skin} className={`min-h-screen transition-colors duration-200 skin-${skin} ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       
       {/* 1. Header (Top Bar Contract: exactly 3 zones) */}
-      <header className={`sticky top-0 z-40 border-b px-4 py-3.5 flex items-center justify-between transition-colors backdrop-blur-md ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm'} print:hidden`}>
+      <header className={`sticky top-0 z-40 border-b px-3 xl:px-4 py-3 flex items-center justify-between transition-colors backdrop-blur-md ${darkMode ? 'bg-slate-900/95 border-slate-800' : 'bg-white/95 border-slate-200 shadow-sm'} print:hidden`}>
         {/* Zone 1: Brand title, single element */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-teal-600 rounded-xl text-white shadow-lg shadow-teal-900/20">
-            <Activity className="w-5 h-5" />
+        <div className="flex items-center gap-2.5 shrink-0">
+          <div className="p-1.5 xl:p-2 bg-teal-600 rounded-xl text-white shadow-lg shadow-teal-900/20">
+            <Activity className="w-4 h-4 xl:w-5 xl:h-5" />
           </div>
-          <span className="text-lg font-black tracking-tight text-teal-400">صيدلية مركز الرعاية</span>
+          <span className="text-sm xl:text-base font-black tracking-tight text-teal-400">{t('app_title')}</span>
         </div>
 
         {/* Zone 2: Navigation Links */}
-        <nav className="hidden lg:flex items-center gap-1.5 text-sm font-semibold">
+        <nav className={`hidden lg:flex items-center justify-center flex-wrap xl:flex-nowrap gap-0.5 xl:gap-1.5 font-bold ${lang === 'ar' ? 'text-[10px] xl:text-[11px] tracking-tight' : 'text-[12px] xl:text-[13px] tracking-normal font-semibold'}`}>
           {isScreenAllowed('dashboard') && (
             <button 
               onClick={() => setActiveTab('dashboard')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'dashboard' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'dashboard' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              لوحة التحكم
+              {t('dashboard')}
             </button>
           )}
           {isScreenAllowed('inventory') && (
             <button 
               onClick={() => setActiveTab('inventory')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'inventory' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'inventory' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              إدارة المخزن
+              {t('inventory')}
             </button>
           )}
           {isScreenAllowed('dispense') && (
             <button 
               onClick={() => setActiveTab('dispense')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'dispense' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'dispense' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              صرف الأدوية
+              {t('dispense')}
             </button>
           )}
           {isScreenAllowed('alternatives') && (
             <button 
               onClick={() => setActiveTab('alternatives')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'alternatives' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'alternatives' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              البدائل العلاجية 🔍
+              {t('alternatives')}
             </button>
           )}
           {isScreenAllowed('residents') && (
             <button 
               onClick={() => setActiveTab('residents')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'residents' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'residents' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              المقيمون 👥
+              {t('residents')}
             </button>
           )}
           {isScreenAllowed('users') && (
             <button 
               onClick={() => setActiveTab('users')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'users' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'users' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              المستخدمون 👤
+              {t('users')}
             </button>
           )}
           {isScreenAllowed('ai_reports') && (
             <button 
               onClick={() => setActiveTab('ai_reports')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'ai_reports' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'ai_reports' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              التقارير والتحليل الذكي
+              {lang === 'ar' ? 'التقارير الذكية ✨' : 'AI Analysis ✨'}
             </button>
           )}
           {isScreenAllowed('behavioral_tracker') && (
             <button 
               onClick={() => setActiveTab('behavioral_tracker')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'behavioral_tracker' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'behavioral_tracker' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              تتبع السلوك والأعراض 🧠
+              {t('behavior')}
             </button>
           )}
           {isScreenAllowed('security') && (
             <button 
               onClick={() => setActiveTab('security')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'security' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'security' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              الحماية والأمن
+              {lang === 'ar' ? 'الحماية والأمن 🛡️' : 'Access & Logs 🛡️'}
             </button>
           )}
           {isScreenAllowed('audit_logs') && (
             <button 
               onClick={() => setActiveTab('audit_logs')} 
-              className={`px-4 py-2 rounded-xl transition-all ${activeTab === 'audit_logs' ? (darkMode ? 'bg-slate-800 text-teal-400' : 'bg-teal-50 text-teal-700') : 'text-slate-400 hover:text-slate-200'}`}
+              className={`px-2 py-1 xl:px-2.5 xl:py-1.5 rounded-lg whitespace-nowrap transition-all ${activeTab === 'audit_logs' ? (darkMode ? 'bg-slate-800 text-teal-400 shadow-sm' : 'bg-teal-50 text-teal-700 shadow-sm') : 'text-slate-400 hover:text-slate-200'}`}
             >
-              سجل التدقيق والمراقبة 📋
+              {lang === 'ar' ? 'سجل التدقيق 📋' : 'Audit Trail 📋'}
             </button>
           )}
         </nav>
 
-        {/* Zone 3: Primary Actions (PWA install, dark mode toggle, role switcher, logout) */}
-        <div className="flex items-center gap-3">
+        {/* Zone 3: Primary Actions (Theme skins, PWA install, dark mode toggle, lang toggle, logout) */}
+        <div className="flex items-center gap-2 xl:gap-3 shrink-0">
+          {/* Theme Skin Picker Button */}
+          <button 
+            type="button"
+            onClick={() => setShowSkinModal(true)}
+            className={`px-2.5 py-1.5 rounded-xl border text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer hover:scale-105 active:scale-95 ${darkMode ? 'border-slate-800 bg-slate-800/60 hover:bg-slate-800 text-teal-400' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-teal-600'}`}
+            title={lang === 'ar' ? 'اختيار مظهر النظام (Skins)' : 'Select theme skin'}
+          >
+            <span>🎨</span>
+            <span className="hidden xl:inline">{t('skin_selector_btn')}</span>
+          </button>
+
           {/* PWA Button */}
           <PWAInstallButton />
           
           {/* Dark Mode toggle */}
           <button 
             onClick={() => setDarkMode(!darkMode)}
-            className={`p-2.5 rounded-xl border transition-all ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-amber-400' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'}`}
-            title={darkMode ? "الوضع النهاري" : "الوضع الليلي"}
+            className={`p-2 xl:p-2.5 rounded-xl border transition-all ${darkMode ? 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-amber-400' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'}`}
+            title={darkMode ? (lang === 'ar' ? "الوضع النهاري" : "Light Mode") : (lang === 'ar' ? "الوضع الليلي" : "Dark Mode")}
           >
             {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
-          {/* Quick Role switcher is completely disabled and locked for all users once logged in */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl border border-rose-950/40 bg-rose-950/20 text-xs transition-all text-rose-300">
-            <span className="font-bold px-2 text-rose-400 hidden sm:inline">الدور الحالي:</span>
-            <select 
-              value={currentUser?.role || 'admin'} 
-              onChange={(e) => handleRoleChange(e.target.value)}
-              disabled={true}
-              className="bg-transparent border-none outline-none font-bold py-1 px-2 font-sans text-rose-400 cursor-not-allowed opacity-80"
-            >
-              <option value="admin" className="bg-slate-900 text-slate-100">مدير النظام</option>
-              <option value="pharmacist" className="bg-slate-900 text-slate-100">صيدلي</option>
-              <option value="technician" className="bg-slate-900 text-slate-100">فني صيدلة</option>
-            </select>
-            <span className="text-[10px] font-bold bg-rose-500/20 text-rose-400 px-1.5 py-0.5 rounded-md flex items-center gap-0.5 ml-1">
-              🔒 مغلق
+          {/* Language Toggle Button */}
+          <button 
+            type="button"
+            onClick={() => {
+              const nextLang = lang === 'ar' ? 'en' : 'ar';
+              setLang(nextLang);
+              localStorage.setItem('care_pharmacy_lang', nextLang);
+              showToast(nextLang === 'ar' ? 'تم تحويل النظام بالكامل إلى اللغة العربية 🇸🇦' : 'System translated to English successfully! 🇺🇸', 'success');
+            }}
+            className={`px-2.5 xl:px-3 py-1.5 xl:py-2 rounded-xl border font-black text-xs transition-all flex items-center gap-1 cursor-pointer hover:scale-105 active:scale-95 ${darkMode ? 'border-slate-800 bg-slate-800/60 hover:bg-slate-800 text-teal-400' : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-teal-600'}`}
+            title={lang === 'ar' ? "Switch to English 🇺🇸" : "التحويل للغة العربية 🇸🇦"}
+          >
+            <span>{lang === 'ar' ? "EN 🇬🇧" : "عربي 🇸🇦"}</span>
+          </button>
+
+          {/* Quick Role display */}
+          <div className="hidden sm:flex items-center gap-1 p-1 rounded-xl border border-rose-950/40 bg-rose-950/20 text-xs text-rose-300">
+            <span className="font-bold px-1.5 text-rose-400 text-[11px]">{lang === 'ar' ? 'الدور:' : 'Role:'}</span>
+            <span className="font-bold text-[11px] text-rose-300 px-1">
+              {lang === 'ar' ? ROLES[currentUser?.role || 'admin']?.name : (currentUser?.role || 'admin').toUpperCase()}
             </span>
           </div>
 
-          {/* Premium Logout Button */}
+          {/* Logout Button */}
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-1.5 px-3 py-2 bg-rose-600/15 hover:bg-rose-600 text-rose-400 hover:text-white rounded-xl border border-rose-500/20 hover:border-rose-600 transition-all text-xs font-bold cursor-pointer"
-            title="تسجيل الخروج"
+            className="flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 xl:py-2 bg-rose-600/15 hover:bg-rose-600 text-rose-400 hover:text-white rounded-xl border border-rose-500/20 hover:border-rose-600 transition-all text-xs font-bold cursor-pointer"
+            title={lang === 'ar' ? 'تسجيل الخروج' : 'Log out'}
           >
             <LogOut className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">تسجيل الخروج</span>
+            <span className="hidden md:inline">{t('logout')}</span>
           </button>
         </div>
       </header>
 
+      {/* Theme Skins Selector Modal */}
+      {showSkinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+          <div className={`w-full max-w-2xl rounded-3xl border p-6 shadow-2xl space-y-6 ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'}`}>
+            <div className="flex items-center justify-between border-b pb-4 border-slate-800/60">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">🎨</span>
+                <div>
+                  <h3 className="text-lg font-black">{t('skin_selector_title')}</h3>
+                  <p className="text-xs text-slate-400">
+                    {lang === 'ar' 
+                      ? 'اختر المظهر اللوني المفضل لديك، يتم حفظ اختيارك تلقائياً' 
+                      : 'Choose your preferred visual theme, choice persists automatically'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowSkinModal(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800/50 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {SKINS.map((s) => {
+                const isSelected = skin === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelectSkin(s.id)}
+                    style={{
+                      backgroundColor: s.bgColor,
+                      borderColor: isSelected ? s.primaryColor : s.borderColor,
+                      boxShadow: isSelected ? `0 0 24px ${s.primaryColor}40` : undefined
+                    }}
+                    className={`p-4 rounded-2xl border-2 transition-all flex flex-col justify-between cursor-pointer hover:scale-[1.02] active:scale-[0.98] ${lang === 'ar' ? 'text-right' : 'text-left'}`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between w-full mb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="w-4 h-4 rounded-full border border-white/20 shadow-sm shrink-0"
+                            style={{ backgroundColor: s.primaryColor }}
+                          />
+                          <span className="font-bold text-xs" style={{ color: s.isDark ? '#f8fafc' : '#0f172a' }}>
+                            {lang === 'ar' ? s.nameAr : s.nameEn}
+                          </span>
+                        </div>
+                        {isSelected ? (
+                          <span 
+                            className="text-[10px] font-black px-2 py-0.5 rounded-full text-white flex items-center gap-1 shadow-sm"
+                            style={{ backgroundColor: s.primaryColor }}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            {lang === 'ar' ? 'المفعل حالياً' : 'Active'}
+                          </span>
+                        ) : (
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${s.badgeClass}`}>
+                            {s.isDark ? (lang === 'ar' ? 'داكن 🌙' : 'Dark 🌙') : (lang === 'ar' ? 'فاتح ☀️' : 'Light ☀️')}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className={`text-[11px] leading-relaxed mb-3 ${s.isDark ? 'text-slate-400' : 'text-slate-600'} ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+                        {lang === 'ar' ? s.descAr : s.descEn}
+                      </p>
+                    </div>
+
+                    {/* Visual Color Palette Swatch Preview */}
+                    <div className="pt-2.5 border-t flex items-center justify-between" style={{ borderColor: `${s.borderColor}80` }}>
+                      <span className="text-[10px] font-bold" style={{ color: s.isDark ? '#94a3b8' : '#64748b' }}>
+                        {lang === 'ar' ? 'باليت ألوان المظهر:' : 'Palette Preview:'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-4 h-3.5 rounded border border-white/10" style={{ backgroundColor: s.bgColor }} title={lang === 'ar' ? 'الخلفية' : 'Background'} />
+                        <div className="w-4 h-3.5 rounded border border-white/10" style={{ backgroundColor: s.cardColor }} title={lang === 'ar' ? 'البطاقات' : 'Cards'} />
+                        <div className="w-4 h-3.5 rounded border border-white/10" style={{ backgroundColor: s.borderColor }} title={lang === 'ar' ? 'الإطارات' : 'Borders'} />
+                        <div className="w-4 h-3.5 rounded shadow-sm" style={{ backgroundColor: s.primaryColor }} title={lang === 'ar' ? 'اللون التفاعلي الرئيسي' : 'Primary Accent'} />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800/60">
+              <button
+                onClick={() => setShowSkinModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer"
+              >
+                {t('cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile Top Navigation Subheader */}
-      <div className={`lg:hidden flex items-center justify-start gap-2 overflow-x-auto px-4 py-2.5 border-b ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'} scrollbar-none print:hidden`}>
+      <div className={`lg:hidden flex items-center justify-start gap-1 overflow-x-auto px-2 py-2 border-b ${darkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'} scrollbar-none print:hidden`}>
         {isScreenAllowed('dashboard') && (
-          <button onClick={() => setActiveTab('dashboard')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'dashboard' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            لوحة التحكم
+          <button onClick={() => setActiveTab('dashboard')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'dashboard' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('dashboard')}
           </button>
         )}
         {isScreenAllowed('inventory') && (
-          <button onClick={() => setActiveTab('inventory')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'inventory' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            إدارة المخزن
+          <button onClick={() => setActiveTab('inventory')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'inventory' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('inventory')}
           </button>
         )}
         {isScreenAllowed('dispense') && (
-          <button onClick={() => setActiveTab('dispense')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'dispense' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            صرف الأدوية
+          <button onClick={() => setActiveTab('dispense')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'dispense' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('dispense')}
           </button>
         )}
         {isScreenAllowed('alternatives') && (
-          <button onClick={() => setActiveTab('alternatives')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'alternatives' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            البدائل العلاجية 🔍
+          <button onClick={() => setActiveTab('alternatives')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'alternatives' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('alternatives')}
           </button>
         )}
         {isScreenAllowed('residents') && (
-          <button onClick={() => setActiveTab('residents')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'residents' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            المقيمون 👥
+          <button onClick={() => setActiveTab('residents')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'residents' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('residents')}
           </button>
         )}
         {isScreenAllowed('users') && (
-          <button onClick={() => setActiveTab('users')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            المستخدمون 👤
+          <button onClick={() => setActiveTab('users')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'users' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('users')}
           </button>
         )}
         {isScreenAllowed('ai_reports') && (
-          <button onClick={() => setActiveTab('ai_reports')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'ai_reports' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            التقارير الطبية
+          <button onClick={() => setActiveTab('ai_reports')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'ai_reports' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {lang === 'ar' ? 'التقارير الطبية ✨' : 'AI Reports ✨'}
           </button>
         )}
         {isScreenAllowed('behavioral_tracker') && (
-          <button onClick={() => setActiveTab('behavioral_tracker')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'behavioral_tracker' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            تتبع السلوك والأعراض 🧠
+          <button onClick={() => setActiveTab('behavioral_tracker')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'behavioral_tracker' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {t('behavior')}
           </button>
         )}
         {isScreenAllowed('security') && (
-          <button onClick={() => setActiveTab('security')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'security' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            الحماية والأمن
+          <button onClick={() => setActiveTab('security')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'security' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {lang === 'ar' ? 'الحماية والأمن 🛡️' : 'Access & Logs 🛡️'}
           </button>
         )}
         {isScreenAllowed('audit_logs') && (
-          <button onClick={() => setActiveTab('audit_logs')} className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-all ${activeTab === 'audit_logs' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
-            سجل التدقيق والمراقبة 📋
+          <button onClick={() => setActiveTab('audit_logs')} className={`px-2 py-1 ${lang === 'ar' ? 'text-[10px]' : 'text-[11.5px] font-bold'} rounded-lg whitespace-nowrap transition-all ${activeTab === 'audit_logs' ? 'bg-teal-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}>
+            {lang === 'ar' ? 'سجل التدقيق والمراقبة 📋' : 'Audit Trail 📋'}
           </button>
         )}
       </div>
@@ -2371,7 +2656,9 @@ export default function App() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <RefreshCw className="w-8 h-8 text-teal-500 animate-spin" />
-            <span className="text-sm font-medium text-slate-400">جاري تحميل نظام الصيدلية وقاعدة البيانات...</span>
+            <span className="text-sm font-medium text-slate-400">
+              {lang === 'ar' ? 'جاري تحميل نظام الصيدلية وقاعدة البيانات...' : 'Loading Care Pharmacy & Secure Cloud DB...'}
+            </span>
           </div>
         )}
 
@@ -2384,16 +2671,22 @@ export default function App() {
                 {/* Upper Hero Banner */}
                 <div className={`rounded-3xl p-6 relative overflow-hidden border shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6 ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-gradient-to-r from-teal-500 to-emerald-600 text-white border-transparent'}`}>
                   <div className="space-y-2 relative z-10">
-                    <h2 className="text-2xl font-black md:text-3xl tracking-tight">مرحباً بك، {currentUser.name} 👋</h2>
+                    <h2 className="text-2xl font-black md:text-3xl tracking-tight">
+                      {t('welcome')} {currentUser.name} 👋
+                    </h2>
                     <p className={`text-sm ${darkMode ? 'text-slate-400' : 'text-teal-50'}`}>
-                      بصفتك <strong className={darkMode ? 'text-teal-400' : 'text-slate-950 bg-white/90 px-2 py-0.5 rounded-md'}>{ROLES[currentUser.role]?.name}</strong>، لديك كامل الصلاحيات لتنظيم صرف ومخزون الأدوية وتأمين بيانات المقيمين ذوي الاحتياجات الخاصة.
+                      {lang === 'ar' ? (
+                        <>بصفتك <strong className={darkMode ? 'text-teal-400' : 'text-slate-950 bg-white/90 px-2 py-0.5 rounded-md'}>{ROLES[currentUser.role]?.name}</strong>، لديك كامل الصلاحيات لتنظيم صرف ومخزون الأدوية وتأمين بيانات المقيمين ذوي الاحتياجات الخاصة.</>
+                      ) : (
+                        <>As a <strong className={darkMode ? 'text-teal-400' : 'text-slate-950 bg-white/90 px-2 py-0.5 rounded-md'}>{currentUser.role.toUpperCase()}</strong>, you are fully authorized to manage medicine stocks, dispense medications, and secure resident files.</>
+                      )}
                     </p>
                     <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
                       <span className={`px-2.5 py-1 rounded-lg ${darkMode ? 'bg-slate-800 text-teal-400' : 'bg-white/20 text-white font-bold'}`}>
-                        مستوى الحماية: عالي جداً
+                        {t('security_level')}
                       </span>
                       <span className={`px-2.5 py-1 rounded-lg ${darkMode ? 'bg-slate-800 text-slate-400' : 'bg-white/20 text-white'}`}>
-                        عنوان الـ IP الحالي: <span className="font-mono">{clientIp}</span>
+                        {t('client_ip')} <span className="font-mono">{clientIp}</span>
                       </span>
                     </div>
                   </div>
@@ -2405,25 +2698,25 @@ export default function App() {
                       className="px-5 py-3 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-sm shadow-lg shadow-teal-900/30 transition-all flex items-center gap-2 active:scale-95"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>تسجيل صرف دواء جديد</span>
+                      <span>{t('new_dispense_btn')}</span>
                     </button>
                     
                     <button 
                       onClick={sendFreeWhatsAppReport}
                       className="px-5 py-3 rounded-2xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all flex items-center gap-2 active:scale-95 shadow-lg shadow-emerald-900/20"
-                      title="إرسال تقرير الصلاحيات للأدوية والكميات مجاناً بالكامل دون أي اشتراك"
+                      title={lang === 'ar' ? 'إرسال تقرير الصلاحيات للأدوية والكميات مجاناً بالكامل دون أي اشتراك' : 'Dispatch instant valid medication stock report directly via WhatsApp for free'}
                     >
                       <Smartphone className="w-4 h-4" />
-                      <span>إرسال تقرير واتساب مجاني 📲</span>
+                      <span>{t('wa_report_btn')}</span>
                     </button>
 
                     <button 
                       onClick={() => triggerScheduledAlertsTest()}
                       className={`px-4 py-3 rounded-2xl text-sm font-bold border transition-all flex items-center gap-2 active:scale-95 ${darkMode ? 'border-slate-800 bg-slate-800/60 hover:bg-slate-800 text-slate-300' : 'border-white/30 bg-white/10 hover:bg-white/20 text-white'}`}
-                      title="محاكاة فحص وإرسال تنبيهات الواتساب والبريد"
+                      title={lang === 'ar' ? 'محاكاة فحص وإرسال تنبيهات الواتساب والبريد' : 'Simulate morning daily safety checking and notify configured channels'}
                     >
                       <Bell className="w-4 h-4 text-amber-400" />
-                      <span>محاكاة إشعارات انتهاء الصلاحية</span>
+                      <span>{t('simulate_alerts_btn')}</span>
                     </button>
                   </div>
                 </div>
@@ -2433,65 +2726,67 @@ export default function App() {
                   
                   <div className={`p-5 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
                     <div className="flex justify-between items-start">
-                      <p className="text-xs font-semibold text-slate-400">قيمة إجمالي المخزون المالي</p>
+                      <p className="text-xs font-semibold text-slate-400">{t('total_val')}</p>
                       <DollarSign className="w-5 h-5 text-teal-500" />
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-1.5">
                       <span className="text-2xl font-black font-mono tracking-tight text-teal-500">
-                        {stats.totalInventoryValue.toLocaleString('ar-SA')}
+                        {lang === 'ar' 
+                          ? stats.totalInventoryValue.toLocaleString('ar-SA') 
+                          : stats.totalInventoryValue.toLocaleString('en-US')}
                       </span>
-                      <span className="text-xs text-slate-400">ر.س</span>
+                      <span className="text-xs text-slate-400">{t('sar')}</span>
                     </div>
                     <div className="mt-1.5 text-xs text-slate-400">
-                      إجمالي الأصناف الفريدة: <span className="font-bold">{stats.totalItems} أصناف</span>
+                      {t('total_items')} <span className="font-bold">{stats.totalItems} {t('items_unit')}</span>
                     </div>
                   </div>
 
                   <div className={`p-5 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
                     <div className="flex justify-between items-start">
-                      <p className="text-xs font-semibold text-slate-400">كميات الأدوية المصروفة فعلياً</p>
+                      <p className="text-xs font-semibold text-slate-400">{t('dispensed_qty')}</p>
                       <UserCheck className="w-5 h-5 text-indigo-500" />
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-1.5">
                       <span className="text-2xl font-black font-mono tracking-tight text-indigo-400">
                         {stats.totalDispensedCount}
                       </span>
-                      <span className="text-xs text-slate-400">وحدة صرف</span>
+                      <span className="text-xs text-slate-400">{t('dispense_unit')}</span>
                     </div>
                     <div className="mt-1.5 text-xs text-slate-400">
-                      عدد عمليات الصرف الإجمالية: <span className="font-bold">{dispenseRecords.length} عملية</span>
+                      {t('dispense_count')} <span className="font-bold">{dispenseRecords.length} {lang === 'ar' ? 'عملية' : 'tx'}</span>
                     </div>
                   </div>
 
                   <div className={`p-5 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
                     <div className="flex justify-between items-start">
-                      <p className="text-xs font-semibold text-slate-400">أدوية قريبة انتهاء الصلاحية</p>
+                      <p className="text-xs font-semibold text-slate-400">{t('near_expiry')}</p>
                       <AlertTriangle className="w-5 h-5 text-amber-500 animate-pulse" />
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-1.5">
                       <span className="text-2xl font-black font-mono tracking-tight text-amber-400">
                         {stats.nearExpiryCount}
                       </span>
-                      <span className="text-xs text-slate-400">أصناف مهددة</span>
+                      <span className="text-xs text-slate-400">{t('items_unit')}</span>
                     </div>
                     <div className="mt-1.5 text-xs text-slate-400">
-                      التنبيه مضبوط قبل: <span className="font-bold text-teal-400">{alertDays} يوماً</span>
+                      {t('alert_config')} <span className="font-bold text-teal-400">{alertDays} {t('days_unit')}</span>
                     </div>
                   </div>
 
                   <div className={`p-5 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
                     <div className="flex justify-between items-start">
-                      <p className="text-xs font-semibold text-slate-400">أدوية منتهية الصلاحية / عجز</p>
+                      <p className="text-xs font-semibold text-slate-400">{t('critical_expired')}</p>
                       <Package className="w-5 h-5 text-rose-500" />
                     </div>
                     <div className="mt-2.5 flex items-baseline gap-1.5">
                       <span className="text-2xl font-black font-mono tracking-tight text-rose-400">
                         {stats.expiredCount + stats.criticalStockCount}
                       </span>
-                      <span className="text-xs text-slate-400">حالات طارئة</span>
+                      <span className="text-xs text-slate-400">{t('emergency_cases')}</span>
                     </div>
                     <div className="mt-1.5 text-xs text-slate-400">
-                      منتهية: <span className="font-bold text-rose-400">{stats.expiredCount}</span> | حرجة: <span className="font-bold text-orange-400">{stats.criticalStockCount}</span>
+                      {t('expired_count')} <span className="font-bold text-rose-400">{stats.expiredCount}</span> | {t('critical_count')} <span className="font-bold text-orange-400">{stats.criticalStockCount}</span>
                     </div>
                   </div>
 
@@ -2504,15 +2799,15 @@ export default function App() {
                       onClick={() => setNotificationAlertText(null)}
                       className="absolute top-3 left-3 text-slate-400 hover:text-white text-xs font-bold"
                     >
-                      إغلاق
+                      {t('cancel')}
                     </button>
                     <h4 className="text-sm font-bold text-teal-400 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-teal-400" />
-                      تمت محاكاة جدولة الإرسال الذاتي للـ WhatsApp والبريد بنجاح!
+                      {text('تمت محاكاة جدولة الإرسال الذاتي للـ WhatsApp والبريد بنجاح!', 'Simulated automated WhatsApp and email dispatch scheduled!')}
                     </h4>
                     <p className="text-xs text-slate-300">{notificationAlertText}</p>
                     <div className="mt-2 bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-xs space-y-1 font-mono text-slate-400 overflow-y-auto max-h-32">
-                      <div className="font-semibold text-teal-500 mb-1">سجل التنبيهات الصادر الفعلي:</div>
+                      <div className="font-semibold text-teal-500 mb-1">{text('سجل التنبيهات الصادر الفعلي:', 'Actual Outgoing Notification Logs:')}</div>
                       {notificationLogs.slice(0, 4).map((log, i) => (
                         <div key={i}>{log}</div>
                       ))}
@@ -2529,14 +2824,14 @@ export default function App() {
                       <div className="space-y-1">
                         <h3 className="text-base font-bold mb-1 flex items-center gap-2">
                           <Activity className="w-5 h-5 text-teal-400" />
-                          <span>معدل الاستهلاك والصرف الدوائي الشهري</span>
+                          <span>{t('monthly_consumption')}</span>
                         </h3>
-                        <p className="text-xs text-slate-400">مراقبة الكميات والجرعات المصروفة شهرياً لمقيمين المركز وقيمتها المالية</p>
+                        <p className="text-xs text-slate-400">{t('monthly_desc')}</p>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs font-semibold bg-slate-950/50 p-1.5 rounded-xl border border-slate-800 self-start">
                         <span className="flex items-center gap-1 text-teal-400 px-2 py-1 bg-teal-400/5 rounded-lg">
                           <TrendingUp className="w-3.5 h-3.5" />
-                          مستقر
+                          {t('stable_badge')}
                         </span>
                       </div>
                     </div>
@@ -2569,13 +2864,14 @@ export default function App() {
                               backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
                               borderColor: darkMode ? '#1e293b' : '#cbd5e1',
                               borderRadius: '16px',
-                              textAlign: 'right',
+                              textAlign: lang === 'ar' ? 'right' : 'left',
                               fontSize: '12px'
                             }}
                           />
                           <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
                           <Area 
                             type="monotone" 
+                            name={text('الكمية المصروفة', 'Dispensed Quantity')}
                             dataKey="الكمية المصروفة" 
                             stroke="#0d9488" 
                             strokeWidth={3}
@@ -2584,6 +2880,7 @@ export default function App() {
                           />
                           <Area 
                             type="monotone" 
+                            name={text('القيمة الإجمالية (ر.س)', 'Total Value (SAR)')}
                             dataKey="القيمة الإجمالية (ر.س)" 
                             stroke="#6366f1" 
                             strokeWidth={3}
@@ -2600,14 +2897,14 @@ export default function App() {
                     <div className="space-y-1 mb-6">
                       <h3 className="text-base font-bold flex items-center gap-2">
                         <Activity className="w-5 h-5 text-indigo-400" />
-                        <span>توزيع المخزون الدوائي الحالي</span>
+                        <span>{t('distribution_title')}</span>
                       </h3>
-                      <p className="text-xs text-slate-400">توزيع كميات الأدوية النشطة بناءً على التصنيف العلاجي</p>
+                      <p className="text-xs text-slate-400">{t('distribution_desc')}</p>
                     </div>
 
                     <div className="h-48 w-full flex items-center justify-center" dir="ltr">
                       {categoryChartData.length === 0 ? (
-                        <span className="text-xs text-slate-400">لا توجد بيانات متاحة حالياً</span>
+                        <span className="text-xs text-slate-400">{t('no_data')}</span>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -2630,10 +2927,10 @@ export default function App() {
                                 borderColor: darkMode ? '#1e293b' : '#cbd5e1',
                                 borderRadius: '12px',
                                 fontSize: '11px',
-                                textAlign: 'right'
+                                textAlign: lang === 'ar' ? 'right' : 'left'
                               }}
                               formatter={(value: any, name: any, props: any) => [
-                                `${value} وحدة (${props.payload.cost} ر.س)`, 
+                                `${value} ${t('unit_qty')} (${props.payload.cost} ${t('sar')})`, 
                                 name
                               ]}
                             />
@@ -2643,14 +2940,14 @@ export default function App() {
                     </div>
 
                     {/* Dynamic Legend under PieChart */}
-                    <div className="space-y-2 mt-4 max-h-36 overflow-y-auto pr-1" dir="rtl">
+                    <div className="space-y-2 mt-4 max-h-36 overflow-y-auto pr-1" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                       {categoryChartData.map((item, idx) => (
                         <div key={idx} className="flex items-center justify-between text-xs text-slate-300">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                            <span className="font-bold truncate max-w-40 text-right">{item.name}</span>
+                            <span className={`font-bold truncate max-w-40 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>{item.name}</span>
                           </div>
-                          <span className="font-mono text-slate-400 text-[11px] shrink-0">{item.value} وحدة</span>
+                          <span className="font-mono text-slate-400 text-[11px] shrink-0">{item.value} {t('unit_qty')}</span>
                         </div>
                       ))}
                     </div>
@@ -2663,17 +2960,17 @@ export default function App() {
                   
                   {/* Stock Value & Varieties per Manufacturer Bar Chart */}
                   <div className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                    <div className="space-y-1 mb-6 text-right">
+                    <div className={`space-y-1 mb-6 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                       <h3 className="text-base font-bold flex items-center gap-2 text-teal-400">
                         <Package className="w-5 h-5 text-teal-400" />
-                        <span>تحليل مخزن الصيدلية حسب الشركة المصنعة</span>
+                        <span>{t('manufacturer_stock')}</span>
                       </h3>
-                      <p className="text-xs text-slate-400">إجمالي القيمة المالية والكميات المتوفرة في المستودع لكل شركة إنتاج</p>
+                      <p className="text-xs text-slate-400">{t('manufacturer_stock_desc')}</p>
                     </div>
 
                     <div className="h-80 w-full" dir="ltr">
                       {manufacturerStockData.length === 0 ? (
-                        <div className="h-full flex items-center justify-center text-xs text-slate-500">لا توجد بيانات متاحة حالياً</div>
+                        <div className="h-full flex items-center justify-center text-xs text-slate-500">{t('no_data')}</div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={manufacturerStockData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
@@ -2693,13 +2990,13 @@ export default function App() {
                                 backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
                                 borderColor: darkMode ? '#1e293b' : '#cbd5e1',
                                 borderRadius: '16px',
-                                textAlign: 'right',
+                                textAlign: lang === 'ar' ? 'right' : 'left',
                                 fontSize: '12px'
                               }}
                             />
                             <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                            <Bar dataKey="القيمة المالية (ر.س)" fill="#0d9488" radius={[8, 8, 0, 0]} />
-                            <Bar dataKey="الكمية المتوفرة" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                            <Bar name={t('total_value_chart')} dataKey="القيمة المالية (ر.س)" fill="#0d9488" radius={[8, 8, 0, 0]} />
+                            <Bar name={t('total_qty_chart')} dataKey="الكمية المتوفرة" fill="#3b82f6" radius={[8, 8, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -2708,17 +3005,17 @@ export default function App() {
 
                   {/* Dispensed Quantities per Manufacturer Bar Chart */}
                   <div className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
-                    <div className="space-y-1 mb-6 text-right">
+                    <div className={`space-y-1 mb-6 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                       <h3 className="text-base font-bold flex items-center gap-2 text-indigo-400">
                         <Activity className="w-5 h-5 text-indigo-400 animate-pulse" />
-                        <span>معدلات سحب وصرف أدوية الشركات للمقيمين</span>
+                        <span>{t('manufacturer_dispense')}</span>
                       </h3>
-                      <p className="text-xs text-slate-400">إجمالي الوحدات والجرعات العلاجية المنصرفة فعلياً والتابعة لإنتاج كل شركة</p>
+                      <p className="text-xs text-slate-400">{t('manufacturer_dispense_desc')}</p>
                     </div>
 
                     <div className="h-80 w-full" dir="ltr">
                       {manufacturerDispenseData.length === 0 ? (
-                        <div className="h-full flex items-center justify-center text-xs text-slate-500">لا توجد سجلات صرف مسجلة حالياً لشركات الأدوية</div>
+                        <div className="h-full flex items-center justify-center text-xs text-slate-500">{text('لا توجد سجلات صرف مسجلة حالياً لشركات الأدوية', 'No dispense records currently found for pharma companies')}</div>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={manufacturerDispenseData} margin={{ top: 10, right: 10, left: -10, bottom: 20 }}>
@@ -2738,12 +3035,12 @@ export default function App() {
                                 backgroundColor: darkMode ? '#0f172a' : '#ffffff', 
                                 borderColor: darkMode ? '#1e293b' : '#cbd5e1',
                                 borderRadius: '16px',
-                                textAlign: 'right',
+                                textAlign: lang === 'ar' ? 'right' : 'left',
                                 fontSize: '12px'
                               }}
                             />
                             <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                            <Bar dataKey="الكمية المصروفة فعلياً" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                            <Bar name={t('actual_dispensed_chart')} dataKey="الكمية المصروفة فعلياً" fill="#6366f1" radius={[8, 8, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -2758,22 +3055,22 @@ export default function App() {
                   {/* 🔮 Predictive Stock Depletion Forecasting Panel */}
                   <div className={`p-6 rounded-3xl border lg:col-span-2 ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <div className="flex items-center justify-between mb-4">
-                      <div className="space-y-1 text-right">
+                      <div className={`space-y-1 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                         <h3 className="text-base font-bold flex items-center gap-2 text-indigo-400">
                           <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
-                          <span>نظام التنبؤ الذكي لنفاد المخزون المستقبلي</span>
+                          <span>{t('predictive_title')}</span>
                         </h3>
-                        <p className="text-xs text-slate-400">تحليل سرعة الصرف والتنبؤ التلقائي بالموعد المتوقع لنفاد الكميات</p>
+                        <p className="text-xs text-slate-400">{t('predictive_desc')}</p>
                       </div>
                     </div>
 
                     {predictiveForecasts.length === 0 ? (
-                      <div className="text-center py-12 space-y-2 bg-slate-950/20 rounded-2xl border border-dashed border-slate-800" dir="rtl">
+                      <div className="text-center py-12 space-y-2 bg-slate-950/20 rounded-2xl border border-dashed border-slate-800" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                         <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-                        <p className="text-xs text-slate-300">مستويات المخزون كافية وآمنة بالكامل للـ 60 يوماً القادمة!</p>
+                        <p className="text-xs text-slate-300">{t('predictive_safe')}</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir="rtl">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                         {predictiveForecasts.map((forecast) => (
                           <div 
                             key={forecast.id} 
@@ -2783,7 +3080,7 @@ export default function App() {
                                 : 'bg-slate-900/50 border-slate-800/85 hover:border-slate-700'
                             }`}
                           >
-                            <div className="space-y-1.5 text-right">
+                            <div className={`space-y-1.5 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                               <div className="flex items-center justify-between gap-2">
                                 <span className="font-bold text-slate-200 text-sm">{forecast.commercialName}</span>
                                 <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
@@ -2791,25 +3088,25 @@ export default function App() {
                                     ? 'bg-rose-500/20 text-rose-400' 
                                     : 'bg-amber-500/10 text-amber-500'
                                 }`}>
-                                  {forecast.daysLeft <= 15 ? 'نفاد حرج 🚨' : 'تزويد مطلوب ⚠️'}
+                                  {forecast.daysLeft <= 15 ? t('depletion_critical') : t('depletion_warning')}
                                 </span>
                               </div>
                               <p className="text-slate-400 text-[11px] truncate">{forecast.scientificName}</p>
                               
                               <div className="flex justify-between items-center bg-slate-950/40 p-2 rounded-xl mt-2">
-                                <span className="text-slate-400 text-[10px]">معدل السحب الشهري:</span>
-                                <span className="font-bold text-teal-400">{forecast.monthlyRate} وحدة/شهر</span>
+                                <span className="text-slate-400 text-[10px]">{t('monthly_draw')}</span>
+                                <span className="font-bold text-teal-400">{forecast.monthlyRate} {text('وحدة/شهر', 'units/mo')}</span>
                               </div>
                             </div>
 
                             <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-800/60">
-                              <span className="text-slate-400 text-[10px]">الكمية المتاحة حالياً:</span>
+                              <span className="text-slate-400 text-[10px]">{t('available_qty')}</span>
                               <span className="font-mono font-bold text-slate-200">{forecast.quantity} {forecast.unit}</span>
                             </div>
 
-                            <div className="mt-2 text-[11px] text-right font-semibold text-teal-300 flex items-center gap-1 justify-end">
+                            <div className={`mt-2 text-[11px] font-semibold text-teal-300 flex items-center gap-1 ${lang === 'ar' ? 'text-right justify-end' : 'text-left justify-start'}`}>
                               <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-                              <span>النفاد المتوقع: خلال <strong className="text-sm font-mono text-rose-400">{forecast.daysLeft}</strong> يوماً فقط!</span>
+                              <span>{t('expected_depletion')} <strong className="text-sm font-mono text-rose-400">{forecast.daysLeft}</strong> {t('expected_days')}</span>
                             </div>
                           </div>
                         ))}
@@ -2821,13 +3118,13 @@ export default function App() {
                   <div className={`p-6 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <h3 className="text-base font-bold mb-4 flex items-center gap-2 text-amber-400">
                       <AlertTriangle className="w-5 h-5 animate-pulse" />
-                      الأدوية الأقرب لانتهاء الصلاحية ({stats.nearExpiryCount})
+                      {t('near_expiry_meds_title')} ({stats.nearExpiryCount})
                     </h3>
                     
                     {stats.nearExpiryMeds.length === 0 ? (
                       <div className="text-center py-12 space-y-2 bg-slate-950/20 rounded-2xl border border-dashed border-slate-800">
                         <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
-                        <p className="text-xs text-slate-400">جميع الأدوية في مخزن الصيدلية صالحة وتخضع للمراقبة التلقائية المستمرة.</p>
+                        <p className="text-xs text-slate-400">{t('near_expiry_safe')}</p>
                       </div>
                     ) : (
                       <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
@@ -2840,10 +3137,10 @@ export default function App() {
                                 <div className="font-bold text-slate-200">{med.commercialName}</div>
                                 <div className="text-slate-400 text-[10px]">{med.scientificName}</div>
                                 <div className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md inline-block">
-                                  ينتهي خلال {diffDays} يوماً
+                                  {text(`ينتهي خلال ${diffDays} يوماً`, `Expires in ${diffDays} days`)}
                                 </div>
                               </div>
-                              <div className="text-left">
+                              <div className={lang === 'ar' ? 'text-left' : 'text-right'}>
                                 <div className="font-mono font-bold text-slate-300">{med.quantity} {med.unit}</div>
                                 <div className="text-[10px] text-slate-500">{med.expiryDate}</div>
                               </div>
@@ -2855,7 +3152,7 @@ export default function App() {
                     
                     <div className="mt-4 p-3 bg-slate-950/40 rounded-xl text-[11px] text-slate-400 leading-relaxed flex gap-2 border border-slate-850">
                       <Info className="w-4 h-4 text-teal-400 shrink-0" />
-                      <span>يمكنك تعديل أيام التنبيه قبل انتهاء الصلاحية من شاشة التقارير والتحليل الذكي.</span>
+                      <span>{text('يمكنك تعديل أيام التنبيه قبل انتهاء الصلاحية من شاشة التقارير والتحليل الذكي.', 'You can customize near-expiry alert days threshold from the AI Reports tab.')}</span>
                     </div>
                   </div>
 
@@ -2866,13 +3163,13 @@ export default function App() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-base font-bold flex items-center gap-2">
                       <FileText className="w-5 h-5 text-indigo-400" />
-                      آخر عمليات صرف الأدوية المسجلة للمقيمين
+                      {text('آخر عمليات صرف الأدوية المسجلة للمقيمين', 'Recently Recorded Medication Dispense Logs')}
                     </h3>
                     <button 
                       onClick={() => setActiveTab('dispense')} 
                       className="text-xs font-bold text-teal-400 hover:text-teal-300"
                     >
-                      عرض جميع السجلات الصادرة ←
+                      {text('عرض جميع السجلات الصادرة ←', 'View all dispense logs ➔')}
                     </button>
                   </div>
 
@@ -2880,12 +3177,12 @@ export default function App() {
                     <table className="w-full text-right text-xs">
                       <thead>
                         <tr className="border-b border-slate-800 text-slate-400 font-bold">
-                          <th className="pb-3">المقيم المستفيد</th>
-                          <th className="pb-3">الدواء</th>
-                          <th className="pb-3">الكمية المقررة</th>
-                          <th className="pb-3">الكمية المصروفة فعلياً</th>
-                          <th className="pb-3">المسؤول عن الصرف</th>
-                          <th className="pb-3 text-left">التاريخ</th>
+                          <th className="pb-3 text-right">{text('المقيم المستفيد', 'Recipient Resident')}</th>
+                          <th className="pb-3 text-right">{text('الدواء', 'Medication')}</th>
+                          <th className="pb-3 text-right">{text('الكمية المقررة', 'Prescribed Qty')}</th>
+                          <th className="pb-3 text-right">{text('الكمية المصروفة فعلياً', 'Actually Dispensed')}</th>
+                          <th className="pb-3 text-right">{text('المسؤول عن الصرف', 'Dispensed By')}</th>
+                          <th className="pb-3 text-left">{text('التاريخ', 'Date & Time')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50">
@@ -2901,7 +3198,7 @@ export default function App() {
                             </td>
                             <td className="py-3 text-slate-400">{rec.dispensedBy}</td>
                             <td className="py-3 font-mono text-slate-400 text-left">
-                              {new Date(rec.dispensedAt).toLocaleString('ar-EG')}
+                              {new Date(rec.dispensedAt).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}
                             </td>
                           </tr>
                         ))}
@@ -2928,7 +3225,7 @@ export default function App() {
                     }`}
                   >
                     <Package className="w-4 h-4 shrink-0" />
-                    <span>دليل الأدوية والمخزون</span>
+                    <span>{text('دليل الأدوية والمخزون', 'Medicine Directory & Stock')}</span>
                   </button>
                   <button
                     onClick={() => setInventorySubTab('companies')}
@@ -2939,7 +3236,7 @@ export default function App() {
                     }`}
                   >
                     <Activity className="w-4 h-4 shrink-0" />
-                    <span>شركات الأدوية المصنعة</span>
+                    <span>{text('شركات الأدوية المصنعة', 'Pharmaceutical Manufacturers')}</span>
                   </button>
                 </div>
 
@@ -2954,7 +3251,7 @@ export default function App() {
                           <Search className="w-4 h-4 text-slate-400 shrink-0" />
                           <input 
                             type="text"
-                            placeholder="ابحث بالاسم التجاري أو العلمي..."
+                            placeholder={text('ابحث بالاسم التجاري أو العلمي...', 'Search by commercial or scientific name...')}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
@@ -2966,7 +3263,7 @@ export default function App() {
                           onChange={(e) => setSelectedCategory(e.target.value)}
                           className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
                         >
-                          <option value="all">كل الفئات العلاجية</option>
+                          <option value="all">{text('كل الفئات العلاجية', 'All Therapeutic Classes')}</option>
                           {categories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
                           ))}
@@ -2977,10 +3274,10 @@ export default function App() {
                           onChange={(e) => setSelectedStockFilter(e.target.value)}
                           className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
                         >
-                          <option value="all">كل المخزون</option>
-                          <option value="critical">المخزون الحرج (≤ 15 وحدة)</option>
-                          <option value="expired">منتهية الصلاحية</option>
-                          <option value="expiring_soon">قريبة انتهاء الصلاحية</option>
+                          <option value="all">{text('كل المخزون', 'All Stock')}</option>
+                          <option value="critical">{text('المخزون الحرج (≤ 15 وحدة)', 'Critical Stock (≤ 15 units)')}</option>
+                          <option value="expired">{text('منتهية الصلاحية', 'Expired Medications')}</option>
+                          <option value="expiring_soon">{text('قريبة انتهاء الصلاحية', 'Expiring Soon')}</option>
                         </select>
                       </div>
 
@@ -2990,7 +3287,7 @@ export default function App() {
                         className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold shadow-lg shadow-teal-900/20 transition-all flex items-center gap-2"
                       >
                         <Plus className="w-4.5 h-4.5" />
-                        <span>إضافة دواء جديد</span>
+                        <span>{text('إضافة دواء جديد', 'Add New Medication')}</span>
                       </button>
 
                     </div>
@@ -3001,15 +3298,15 @@ export default function App() {
                         <table className="w-full text-right text-xs">
                           <thead>
                             <tr className="border-b border-slate-800/80 text-slate-400 font-black tracking-wide">
-                              <th className="p-4">الاسم التجاري والشركة المصنعة</th>
-                              <th className="p-4">الاسم العلمي والبدائل</th>
-                              <th className="p-4">الفئة العلاجية</th>
-                              <th className="p-4">الكمية المتوفرة</th>
-                              <th className="p-4">الوحدة</th>
-                              <th className="p-4">سعر الوحدة</th>
-                              <th className="p-4">تاريخ انتهاء الصلاحية</th>
-                              <th className="p-4">حالة الصنف</th>
-                              <th className="p-4 text-left print:hidden">إجراءات</th>
+                              <th className="p-4 text-right">{text('الاسم التجاري والشركة المصنعة', 'Brand Name & Manufacturer')}</th>
+                              <th className="p-4 text-right">{text('الاسم العلمي والبدائل', 'Scientific & Alternatives')}</th>
+                              <th className="p-4 text-right">{text('الفئة العلاجية', 'Therapeutic Class')}</th>
+                              <th className="p-4 text-right">{text('الكمية المتوفرة', 'Available Stock')}</th>
+                              <th className="p-4 text-right">{text('الوحدة', 'Unit')}</th>
+                              <th className="p-4 text-right">{text('سعر الوحدة', 'Unit Price')}</th>
+                              <th className="p-4 text-right">{text('تاريخ انتهاء الصلاحية', 'Expiry Date')}</th>
+                              <th className="p-4 text-right">{text('حالة الصنف', 'Status')}</th>
+                              <th className="p-4 text-left print:hidden">{text('إجراءات', 'Actions')}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/40">
@@ -3083,7 +3380,7 @@ export default function App() {
                                         <button
                                           onClick={() => openEditModal(med)}
                                           className="p-1.5 rounded-lg text-teal-400 hover:bg-slate-800 transition"
-                                          title="تعديل"
+                                          title={text("تعديل", "Edit")}
                                         >
                                           <Edit2 className="w-4 h-4" />
                                         </button>
@@ -3091,7 +3388,7 @@ export default function App() {
                                         <button
                                           onClick={() => setDeleteConfirmId(med.id)}
                                           className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 transition"
-                                          title="حذف"
+                                          title={text("حذف", "Delete")}
                                         >
                                           <Trash2 className="w-4 h-4" />
                                         </button>
@@ -3114,7 +3411,7 @@ export default function App() {
                         <Search className="w-4 h-4 text-slate-400 shrink-0" />
                         <input 
                           type="text"
-                          placeholder="ابحث باسم الشركة، بلد التصنيع، البريد..."
+                          placeholder={text('ابحث باسم الشركة، بلد التصنيع، البريد...', 'Search by company name, country, email...')}
                           value={companiesSearchQuery}
                           onChange={(e) => setCompaniesSearchQuery(e.target.value)}
                           className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
@@ -3130,7 +3427,7 @@ export default function App() {
                         className="px-5 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-lg shadow-teal-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
                       >
                         <Plus className="w-4.5 h-4.5" />
-                        <span>إضافة شركة أدوية جديدة</span>
+                        <span>{text('إضافة شركة أدوية جديدة', 'Register New Company')}</span>
                       </button>
                     </div>
 
@@ -3140,13 +3437,13 @@ export default function App() {
                         <table className="w-full text-right text-xs">
                           <thead>
                             <tr className="border-b border-slate-800 text-slate-400 font-bold">
-                              <th className="p-4">اسم الشركة المصنعة</th>
-                              <th className="p-4">بلد التصنيع/المنشأ</th>
-                              <th className="p-4">مسؤول التواصل</th>
-                              <th className="p-4">رقم الهاتف</th>
-                              <th className="p-4">البريد الإلكتروني</th>
-                              <th className="p-4">ملاحظات ووكلاء التوزيع</th>
-                              <th className="p-4 text-left">إجراءات</th>
+                              <th className="p-4 text-right">{text('اسم الشركة المصنعة', 'Company Name')}</th>
+                              <th className="p-4 text-right">{text('بلد التصنيع/المنشأ', 'Country of Origin')}</th>
+                              <th className="p-4 text-right">{text('مسؤول التواصل', 'Sales Representative')}</th>
+                              <th className="p-4 text-right">{text('رقم الهاتف', 'Contact Phone')}</th>
+                              <th className="p-4 text-right">{text('البريد الإلكتروني', 'Email Address')}</th>
+                              <th className="p-4 text-right">{text('ملاحظات ووكلاء التوزيع', 'Notes & Distributors')}</th>
+                              <th className="p-4 text-left">{text('إجراءات', 'Actions')}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/40">
@@ -3193,14 +3490,14 @@ export default function App() {
                                       <button 
                                         onClick={() => openEditCompanyModal(c)}
                                         className="p-1.5 bg-slate-855 hover:bg-slate-800 text-teal-400 rounded-lg hover:text-white transition cursor-pointer"
-                                        title="تعديل بيانات الشركة"
+                                        title={text("تعديل بيانات الشركة", "Edit Company Details")}
                                       >
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </button>
                                       <button 
                                         onClick={() => setDeleteConfirmCompanyId(c.id)}
                                         className="p-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white rounded-lg transition cursor-pointer"
-                                        title="حذف الشركة"
+                                        title={text("حذف الشركة", "Delete Company")}
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
@@ -3221,35 +3518,35 @@ export default function App() {
 
             {/* ----------------- TAB: ALTERNATIVES (البدائل العلاجية) ----------------- */}
             {activeTab === 'alternatives' && (
-              <div className="space-y-6 animate-fade-in text-right" dir="rtl">
+              <div className="space-y-6 animate-fade-in text-right">
                 <div className="flex justify-between items-center pb-4 border-b border-slate-800">
                   <div>
                     <h2 className="text-xl font-black text-slate-200 flex items-center gap-2">
                       <Sparkles className="w-6 h-6 text-teal-400" />
-                      <span>🔍 دليل بدائل الأدوية الذكي</span>
+                      <span>{text('🔍 دليل بدائل الأدوية الذكي', '🔍 Smart Therapeutic Alternatives Directory')}</span>
                     </h2>
-                    <p className="text-xs text-slate-400">ابحث عن أي دواء لمعرفة بدائله العلاجية المتوفرة وحالة المخزون العيني له</p>
+                    <p className="text-xs text-slate-400">{text('ابحث عن أي دواء لمعرفة بدائله العلاجية المتوفرة وحالة المخزون العيني له', 'Search any brand to instantly find its registered therapeutic alternatives and stock levels')}</p>
                   </div>
                 </div>
 
                 <div className={`p-6 rounded-3xl border relative ${darkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 text-slate-900'}`}>
-                  <label className="block text-slate-400 mb-2 font-bold text-xs">اختر أو ابحث عن اسم الدواء التجاري أو العلمي:</label>
+                  <label className="block text-slate-400 mb-2 font-bold text-xs">{text('اختر أو ابحث عن اسم الدواء التجاري أو العلمي:', 'Select or search for Commercial or Scientific Name:')}</label>
                   
                   {/* Searchable Combobox */}
                   <div className="relative max-w-xl">
                     <div className="relative flex items-center">
                       <input
                         type="text"
-                        placeholder="اكتب اسم الدواء التجاري أو العلمي للبحث..."
+                        placeholder={text('اكتب اسم الدواء التجاري أو العلمي للبحث...', 'Type commercial or scientific name to search...')}
                         value={searchAlternativeQuery}
                         onChange={(e) => {
                           setSearchAlternativeQuery(e.target.value);
                           setDropdownOpen(true);
                         }}
                         onFocus={() => setDropdownOpen(true)}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none pr-10 text-right"
+                        className={`w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none ${lang === 'ar' ? 'pr-10 text-right' : 'pl-10 text-left'}`}
                       />
-                      <Search className="w-5 h-5 text-slate-500 absolute right-3" />
+                      <Search className={`w-5 h-5 text-slate-500 absolute ${lang === 'ar' ? 'right-3' : 'left-3'}`} />
                       
                       {searchAlternativeQuery && (
                         <button
@@ -3382,12 +3679,12 @@ export default function App() {
                                         }}
                                         className="w-full text-center text-[10px] bg-slate-900 hover:bg-slate-800 text-teal-400 py-1.5 rounded-xl transition mt-1 cursor-pointer font-bold border border-slate-800"
                                       >
-                                        انقر لعرض تفاصيل هذا البديل 🔍
+                                        {text('انقر لعرض تفاصيل هذا البديل 🔍', 'Click to view alternative details 🔍')}
                                       </button>
                                     </div>
                                   ) : (
                                     <div className="pt-2 border-t border-slate-900 text-[11px] text-rose-400/80 flex justify-between items-center">
-                                      <span>غير متوفر بالمستودع عيناً ❌</span>
+                                      <span>{text('غير متوفر بالمستودع عيناً ❌', 'Not in warehouse stock ❌')}</span>
                                     </div>
                                   )}
                                 </div>
@@ -3422,12 +3719,12 @@ export default function App() {
                 <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-900/60 text-indigo-200 text-xs leading-relaxed flex gap-3 items-center">
                   <Info className="w-5 h-5 text-indigo-400 shrink-0" />
                   <div>
-                    <strong>نظام الصرف المزدوج للمراجعة والتدقيق:</strong> يتيح هذا النظام تدوين "الكمية المطلوبة" و"الكمية المصروفة فعلياً" بواسطة الصيدلي لمرضى الرعاية لذوي الاحتياجات الخاصة، وذلك لأغراض السلامة الدوائية وتفادي الأخطاء الطبية وضمان تطابق الجرعات المصروفة تماماً.
+                    <strong>{text('نظام الصرف المزدوج للمراجعة والتدقيق:', 'Dual-Verification Dispensation System:')}</strong> {text('يتيح هذا النظام تدوين "الكمية المطلوبة" و"الكمية المصروفة فعلياً" بواسطة الصيدلي لمرضى الرعاية لذوي الاحتياجات الخاصة، وذلك لأغراض السلامة الدوائية وتفادي الأخطاء الطبية وضمان تطابق الجرعات المصروفة تماماً.', 'This module tracks requested quantities and actual quantities dispensed side-by-side for patients with special needs, maximizing medical safety, reducing errors, and ensuring correct dosage.')}
                   </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
-                  <h3 className="text-lg font-bold text-slate-200">سجل عمليات صرف الأدوية للمقيمين بالمركز</h3>
+                  <h3 className="text-lg font-bold text-slate-200">{text('سجل عمليات صرف الأدوية للمقيمين بالمركز', 'Medication Dispense Log Directory')}</h3>
                   
                   <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1 sm:flex-initial sm:min-w-[420px]">
                     {/* Search Bar */}
@@ -3435,7 +3732,7 @@ export default function App() {
                       <Search className="w-4 h-4 text-slate-400 shrink-0" />
                       <input 
                         type="text"
-                        placeholder="ابحث باسم المقيم، اسم الدواء، أو الصيدلي..."
+                        placeholder={text('ابحث باسم المقيم، اسم الدواء، أو الصيدلي...', 'Search by resident, medication, or pharmacist...')}
                         value={dispenseSearchQuery}
                         onChange={(e) => setDispenseSearchQuery(e.target.value)}
                         className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
@@ -3447,7 +3744,7 @@ export default function App() {
                       className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
                     >
                       <Plus className="w-4.5 h-4.5" />
-                      <span className="whitespace-nowrap">تسجيل صرف دواء جديد لمقيم</span>
+                      <span className="whitespace-nowrap">{text('تسجيل صرف دواء جديد لمقيم', 'Record New Medication Dispense')}</span>
                     </button>
                   </div>
                 </div>
@@ -3458,14 +3755,14 @@ export default function App() {
                     <table className="w-full text-right text-xs">
                       <thead>
                         <tr className="border-b border-slate-800 text-slate-400 font-bold">
-                          <th className="p-4">اسم المقيم المستفيد</th>
-                          <th className="p-4">اسم الدواء المصروف</th>
-                          <th className="p-4">الكمية المقررة</th>
-                          <th className="p-4">الكمية المصروفة فعلياً</th>
-                          <th className="p-4">الوحدة</th>
-                          <th className="p-4">إجمالي السعر</th>
-                          <th className="p-4">اسم الصيدلي المسؤول</th>
-                          <th className="p-4 text-left">تاريخ ووقت الصرف</th>
+                          <th className="p-4 text-right">{text('اسم المقيم المستفيد', 'Recipient Resident')}</th>
+                          <th className="p-4 text-right">{text('اسم الدواء المصروف', 'Medication Dispensed')}</th>
+                          <th className="p-4 text-right">{text('الكمية المقررة', 'Prescribed Qty')}</th>
+                          <th className="p-4 text-right">{text('الكمية المصروفة فعلياً', 'Actually Dispensed')}</th>
+                          <th className="p-4 text-right">{text('الوحدة', 'Unit')}</th>
+                          <th className="p-4 text-right">{text('إجمالي السعر', 'Total Cost')}</th>
+                          <th className="p-4 text-right">{text('اسم الصيدلي المسؤول', 'Responsible Pharmacist')}</th>
+                          <th className="p-4 text-left">{text('تاريخ ووقت الصرف', 'Dispensation Timestamp')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/40">
@@ -3532,15 +3829,15 @@ export default function App() {
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <h3 className="text-base font-bold text-slate-200 mb-3 flex items-center gap-2">
                       <Bell className="w-5 h-5 text-amber-500" />
-                      إعدادات تنبيهات الصلاحية وجدولة المهام
+                      {text('إعدادات تنبيهات الصلاحية وجدولة المهام', 'Expiry Notification Threshold & Task Scheduling')}
                     </h3>
                     <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                      حدد عدد الأيام اللازمة لتنبيه الصيدلية قبل انتهاء صلاحية الدواء لاتخاذ التدابير الوقائية. سيقوم النظام آلياً بإرسال تنبيهات واتساب وبريد إلكتروني.
+                      {text('حدد عدد الأيام اللازمة لتنبيه الصيدلية قبل انتهاء صلاحية الدواء لاتخاذ التدابير الوقائية. سيقوم النظام آلياً بإرسال تنبيهات واتساب وبريد إلكتروني.', 'Specify the number of days required to alert the pharmacy before any medication expires. The system automatically schedules email & WhatsApp notifications.')}
                     </p>
                     
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-300 mb-2">أيام التنبيه المفضلة قبل انتهاء الصلاحية:</label>
+                        <label className="block text-xs font-bold text-slate-300 mb-2">{text('أيام التنبيه المفضلة قبل انتهاء الصلاحية:', 'Notification Alert Days Threshold:')}</label>
                         <div className="flex gap-2">
                           <input 
                             type="number"
@@ -3550,7 +3847,7 @@ export default function App() {
                             onChange={(e) => setAlertDays(Number(e.target.value))}
                             className={`px-3 py-2 rounded-xl border font-mono font-bold text-xs w-28 outline-none ${darkMode ? 'bg-slate-950 border-slate-800 text-teal-400' : 'bg-white border-slate-200'}`}
                           />
-                          <span className="text-xs text-slate-400 self-center">يوماً</span>
+                          <span className="text-xs text-slate-400 self-center">{text('يوماً', 'Days')}</span>
                         </div>
                       </div>
 
@@ -3559,21 +3856,21 @@ export default function App() {
                           onClick={() => triggerScheduledAlertsTest()}
                           className="px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition"
                         >
-                          تفعيل واختبار جدولة مهام التنبيه
+                          {text('تفعيل واختبار جدولة مهام التنبيه', 'Trigger Expiry Scan & Test Alerts')}
                         </button>
                         <button
                           onClick={handlePrint}
                           className="px-4 py-2 text-xs font-bold bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 rounded-xl transition flex items-center gap-1"
                         >
                           <Printer className="w-3.5 h-3.5" />
-                          <span>تصدير وطباعة تقرير المخزن (RTL PDF)</span>
+                          <span>{text('تصدير وطباعة تقرير المخزن (PDF)', 'Export & Print Stock Report (PDF)')}</span>
                         </button>
                         <button
                           onClick={handleExportCSV}
                           className="px-4 py-2 text-xs font-bold bg-teal-600 hover:bg-teal-750 text-white rounded-xl transition flex items-center gap-1"
                         >
                           <FileText className="w-3.5 h-3.5" />
-                          <span>تنزيل تقرير Excel (CSV)</span>
+                          <span>{text('تنزيل تقرير Excel (CSV)', 'Download CSV Excel Spreadsheet')}</span>
                         </button>
                       </div>
                     </div>
@@ -3582,10 +3879,10 @@ export default function App() {
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <h3 className="text-base font-bold text-slate-200 mb-2 flex items-center gap-2">
                       <Sparkles className="w-5 h-5 text-teal-400" />
-                      التحليل الاستباقي والذكاء الاصطناعي الآمن
+                      {text('التحليل الاستباقي والذكاء الاصطناعي الآمن', 'Proactive Strategic Planning & Secure AI')}
                     </h3>
                     <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                      تتكامل هذه الوحدة مع خبير التحليل الصيدلاني الاستباقي لمراقبة المخزن والكميات وسلوك الاستهلاك وتوقع النقص أو الحاجة لإعادة الطلب بطريقة مدمجة بالكامل مع النظام ومبسطة.
+                      {text('تتكامل هذه الوحدة مع خبير التحليل الصيدلاني الاستباقي لمراقبة المخزن والكميات وسلوك الاستهلاك وتوقع النقص أو الحاجة لإعادة الطلب بطريقة مدمجة بالكامل مع النظام ومبسطة.', 'This module connects with the system’s proactive clinical analytics to analyze draw rates, predict stockouts, and recommend therapeutic alternatives effortlessly.')}
                     </p>
 
                     <button
@@ -3594,7 +3891,7 @@ export default function App() {
                       className="px-5 py-3 rounded-2xl bg-teal-600 hover:bg-teal-750 disabled:bg-slate-800 text-white font-bold text-sm shadow-lg shadow-teal-900/20 transition-all flex items-center gap-2"
                     >
                       {aiLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 text-yellow-300" />}
-                      <span>طلب تحليل المخزون الاستراتيجي المتقدم</span>
+                      <span>{text('طلب تحليل المخزون الاستراتيجي المتقدم', 'Generate Strategic Stock Analysis')}</span>
                     </button>
                   </div>
 
@@ -3604,8 +3901,8 @@ export default function App() {
                 {aiLoading && (
                   <div className="p-10 rounded-3xl bg-slate-900/50 border border-slate-800 text-center space-y-3">
                     <RefreshCw className="w-8 h-8 text-teal-500 animate-spin mx-auto" />
-                    <h4 className="text-sm font-bold text-slate-300">جاري صياغة وتحليل التقرير الاستباقي الشامل...</h4>
-                    <p className="text-xs text-slate-400 max-w-md mx-auto">يقوم النظام حالياً بدراسة تواريخ انتهاء الصلاحية للمخزون ومقارنة معدلات صرف الأدوية للتنبؤ بنفاذ المخازن وتقديم البدائل الطبية الفعالة.</p>
+                    <h4 className="text-sm font-bold text-slate-300">{text('جاري صياغة وتحليل التقرير الاستباقي الشامل...', 'Drafting and compiling comprehensive proactive stock analysis...')}</h4>
+                    <p className="text-xs text-slate-400 max-w-md mx-auto">{text('يقوم النظام حالياً بدراسة تواريخ انتهاء الصلاحية للمخزون ومقارنة معدلات صرف الأدوية للتنبؤ بنفاذ المخازن وتقديم البدائل الطبية الفعالة.', 'The system is analyzing batch expiry dates, drawing logs, and evaluating consumption speed to forecast stock depletion and match alternatives.')}</p>
                   </div>
                 )}
 
@@ -3614,9 +3911,9 @@ export default function App() {
                     <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                       <div className="flex items-center gap-2">
                         <Sparkles className="w-5 h-5 text-teal-400" />
-                        <h4 className="text-base font-black text-teal-400">نظام المستشار الاستراتيجي الصيدلاني - التحليل والبدائل الدوائية</h4>
+                        <h4 className="text-base font-black text-teal-400">{text('نظام المستشار الاستراتيجي الصيدلاني - التحليل والبدائل الدوائية', 'Strategic Clinical Advisor System - Analytics & Alternatives')}</h4>
                       </div>
-                      <span className="text-xs text-slate-400 font-mono">تحديث: {new Date().toLocaleDateString('ar-EG')}</span>
+                      <span className="text-xs text-slate-400 font-mono">{text('تحديث:', 'Updated:')} {new Date().toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}</span>
                     </div>
 
                     <div className="text-xs text-slate-300 space-y-3 leading-relaxed whitespace-pre-wrap font-sans">
@@ -3624,19 +3921,19 @@ export default function App() {
                     </div>
 
                     <div className="pt-4 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
-                      <span>*ملاحظة: هذا التقرير هو مرجع استشاري إداري يخضع لتدقيق الصيدلي المسؤول بالمركز قبل الطلب الفعلي.</span>
+                      <span>{text('*ملاحظة: هذا التقرير هو مرجع استشاري إداري يخضع لتدقيق الصيدلي المسؤول بالمركز قبل الطلب الفعلي.', '*Note: This analysis report is a clinical advisory reference and must be verified by the supervising pharmacist.')}</span>
                       <button 
                         onClick={() => {
                           const w = window.open();
                           if (w) {
-                            w.document.write(`<div dir="rtl" style="font-family:sans-serif;padding:30px;line-height:1.6;">${aiReport.replace(/\n/g, '<br/>')}</div>`);
+                            w.document.write(`<div dir="${lang === 'ar' ? 'rtl' : 'ltr'}" style="font-family:sans-serif;padding:30px;line-height:1.6;">${aiReport.replace(/\n/g, '<br/>')}</div>`);
                             w.print();
                           }
                         }}
                         className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5"
                       >
                         <Printer className="w-3.5 h-3.5" />
-                        <span>طباعة التقرير الفني فقط</span>
+                        <span>{text('طباعة التقرير الفني فقط', 'Print Analytics Report Only')}</span>
                       </button>
                     </div>
                   </div>
@@ -3656,10 +3953,10 @@ export default function App() {
                   <div className={`p-5 rounded-3xl border md:col-span-2 ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <h3 className="text-base font-bold text-slate-200 mb-3 flex items-center gap-2">
                       <Shield className="w-5 h-5 text-indigo-400" />
-                      مصفوفة الصلاحيات القائمة على الأدوار (RBAC) لسلامة العمليات
+                      {text('مصفوفة الصلاحيات القائمة على الأدوار (RBAC) لسلامة العمليات', 'Role-Based Access Control Matrix (RBAC) for Safety')}
                     </h3>
                     <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                      يتيح النظام أماناً مطلقاً من خلال حظر تعديل الأدوية أو صرفها بدون الحصول على الترخيص الوظيفي المناسب. راقب كيف تتأثر الشاشات المسموحة بناءً على دور المستخدم:
+                      {text('يتيح النظام أماناً مطلقاً من خلال حظر تعديل الأدوية أو صرفها بدون الحصول على الترخيص الوظيفي المناسب. راقب كيف تتأثر الشاشات المسموحة بناءً على دور المستخدم:', 'The system provides absolute safety by locking unauthorized updates or dispensations without credentials. See how screens and access vary by role:')}
                     </p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -3667,42 +3964,42 @@ export default function App() {
                       <div className={`p-3.5 rounded-2xl border ${currentUser.role === 'admin' ? 'border-teal-500 bg-teal-500/5' : 'border-slate-800 bg-slate-900/20'}`}>
                         <div className="flex items-center gap-2 mb-2">
                           <UserCheck className="w-4 h-4 text-teal-400" />
-                          <span className="text-xs font-bold text-slate-200">المدير (Admin)</span>
+                          <span className="text-xs font-bold text-slate-200">{text('المدير (Admin)', 'Administrator (Admin)')}</span>
                         </div>
-                        <ul className="text-[10px] text-slate-400 space-y-1 list-disc list-inside">
-                          <li>رؤية إحصائيات لوحة التحكم</li>
-                          <li>إدارة المخزن بالكامل (CRUD)</li>
-                          <li>تسجيل وتعديل صرف المقيمين</li>
-                          <li>عرض تقارير الذكاء الاصطناعي</li>
-                          <li>مراجعة تتبع جلسات وعناوين الـ IP</li>
+                        <ul className={`text-[10px] text-slate-400 space-y-1 list-disc ${lang === 'ar' ? 'list-inside' : 'list-inside'}`}>
+                          <li>{text('رؤية إحصائيات لوحة التحكم', 'View dashboard analytics & metrics')}</li>
+                          <li>{text('إدارة المخزن بالكامل (CRUD)', 'Full stock inventory control (CRUD)')}</li>
+                          <li>{text('تسجيل وتعديل صرف المقيمين', 'Record & edit resident dispensations')}</li>
+                          <li>{text('عرض تقارير الذكاء الاصطناعي', 'Access strategic AI clinical analysis')}</li>
+                          <li>{text('مراجعة تتبع جلسات وعناوين الـ IP', 'Audit device sessions & IP tracking')}</li>
                         </ul>
                       </div>
 
                       <div className={`p-3.5 rounded-2xl border ${currentUser.role === 'pharmacist' ? 'border-teal-500 bg-teal-500/5' : 'border-slate-800 bg-slate-900/20'}`}>
                         <div className="flex items-center gap-2 mb-2">
                           <UserCheck className="w-4 h-4 text-indigo-400" />
-                          <span className="text-xs font-bold text-slate-200">الصيادلة (Pharmacist)</span>
+                          <span className="text-xs font-bold text-slate-200">{text('الصيادلة (Pharmacist)', 'Licensed Pharmacist')}</span>
                         </div>
                         <ul className="text-[10px] text-slate-400 space-y-1 list-disc list-inside">
-                          <li>رؤية إحصائيات لوحة التحكم</li>
-                          <li>إضافة وتحديث الأدوية</li>
-                          <li>صرف الأدوية للمقيمين</li>
-                          <li>رؤية التحليلات الطبية والذكاء الاصطناعي</li>
-                          <li className="text-rose-400/80">حظر حذف الأدوية المسجلة</li>
+                          <li>{text('رؤية إحصائيات لوحة التحكم', 'View dashboard statistics')}</li>
+                          <li>{text('إضافة وتحديث الأدوية', 'Add & update medicine directory')}</li>
+                          <li>{text('صرف الأدوية للمقيمين', 'Dispense prescriptions to residents')}</li>
+                          <li>{text('رؤية التحليلات الطبية والذكاء الاصطناعي', 'Review AI analysis & clinical recommendations')}</li>
+                          <li className="text-rose-400/80">{text('حظر حذف الأدوية المسجلة', 'Medication deletion restricted')}</li>
                         </ul>
                       </div>
 
                       <div className={`p-3.5 rounded-2xl border ${currentUser.role === 'technician' ? 'border-teal-500 bg-teal-500/5' : 'border-slate-800 bg-slate-900/20'}`}>
                         <div className="flex items-center gap-2 mb-2">
                           <UserCheck className="w-4 h-4 text-amber-400" />
-                          <span className="text-xs font-bold text-slate-200">فنيو الصيدلة (Technician)</span>
+                          <span className="text-xs font-bold text-slate-200">{text('فنيو الصيدلة (Technician)', 'Pharmacy Technician')}</span>
                         </div>
                         <ul className="text-[10px] text-slate-400 space-y-1 list-disc list-inside">
-                          <li>لوحة التحكم العامة ومستويات المخزون</li>
-                          <li>إضافة أدوية جديدة</li>
-                          <li>تسجيل صرف الأدوية للمراجعة</li>
-                          <li className="text-rose-400/80">حظر حذف الأدوية من المخزن</li>
-                          <li className="text-rose-400/80">حظر رؤية لوحة التحكم الأمنية</li>
+                          <li>{text('لوحة التحكم العامة ومستويات المخزون', 'General dashboard & stock overview')}</li>
+                          <li>{text('إضافة أدوية جديدة', 'Input new medicine entries')}</li>
+                          <li>{text('تسجيل صرف الأدوية للمراجعة', 'Submit dispensations for pharmacist review')}</li>
+                          <li className="text-rose-400/80">{text('حظر حذف الأدوية من المخزن', 'Medication stock deletion locked')}</li>
+                          <li className="text-rose-400/80">{text('حظر رؤية لوحة التحكم الأمنية', 'Security audit trail restricted')}</li>
                         </ul>
                       </div>
 
@@ -3713,30 +4010,30 @@ export default function App() {
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <h3 className="text-base font-bold text-slate-200 mb-3 flex items-center gap-2">
                       <Monitor className="w-5 h-5 text-teal-400" />
-                      تتبع جلسة جهازك الحالي
+                      {text('تتبع جلسة جهازك الحالي', 'Current Device Session Tracking')}
                     </h3>
                     <div className="space-y-3.5 text-xs">
                       <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-slate-400">عنوان الـ IP:</span>
+                          <span className="text-slate-400">{text('عنوان الـ IP:', 'IP Address:')}</span>
                           <span className="font-mono text-teal-400 font-bold">{clientIp}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">اسم المستخدم النشط:</span>
+                          <span className="text-slate-400">{text('اسم المستخدم النشط:', 'Active User Name:')}</span>
                           <span className="font-bold text-slate-300">{currentUser.name}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">البريد الإلكتروني:</span>
+                          <span className="text-slate-400">{text('البريد الإلكتروني:', 'Email Address:')}</span>
                           <span className="font-mono text-slate-300">{currentUser.email}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">رقم الهاتف المسجل:</span>
+                          <span className="text-slate-400">{text('رقم الهاتف المسجل:', 'Registered Phone:')}</span>
                           <span className="font-mono text-teal-500 font-bold">{currentUser.phone}</span>
                         </div>
                       </div>
 
                       <div className="p-3 bg-slate-900 rounded-xl text-[11px] text-slate-400 leading-relaxed">
-                        يتم التقاط وحفظ هذه البيانات تلقائياً وتحديثها في مستندات Firestore الفرعية لتوفير شفافية الأمان ومكافحة تسريب البيانات الطبية للمرضى المقيمين بالمركز.
+                        {text('يتم التقاط وحفظ هذه البيانات تلقائياً وتحديثها في مستندات Firestore الفرعية لتوفير شفافية الأمان ومكافحة تسريب البيانات الطبية للمرضى المقيمين بالمركز.', 'This metadata is captured automatically in real-time to guarantee audit compliance and protect resident health records from data leaks.')}
                       </div>
                     </div>
                   </div>
@@ -3747,18 +4044,18 @@ export default function App() {
                 <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
                   <h3 className="text-base font-bold mb-4 flex items-center gap-2">
                     <UserCheck className="w-5 h-5 text-indigo-400" />
-                    سجل تتبع جلسات الدخول للأنظمة (Collection: user_sessions)
+                    {text('سجل تتبع جلسات الدخول للأنظمة (Collection: user_sessions)', 'User Sign-in & Device Session Trail (Collection: user_sessions)')}
                   </h3>
 
                   <div className="overflow-x-auto">
-                    <table className="w-full text-right text-xs">
+                    <table className={`w-full text-xs ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                       <thead>
                         <tr className="border-b border-slate-800 text-slate-400 font-bold">
-                          <th className="pb-3">معرف المستخدم</th>
-                          <th className="pb-3">الاسم والبريد</th>
-                          <th className="pb-3">عنوان الـ IP Address</th>
-                          <th className="pb-3">رمز جهاز المستعرض (Device Token)</th>
-                          <th className="pb-3 text-left">توقيت تسجيل الدخول والتسجيل بالخادم</th>
+                          <th className="pb-3">{text('معرف المستخدم', 'User ID')}</th>
+                          <th className="pb-3">{text('الاسم والبريد', 'Name & Email')}</th>
+                          <th className="pb-3">{text('عنوان الـ IP Address', 'IP Address')}</th>
+                          <th className="pb-3">{text('رمز جهاز المستعرض (Device Token)', 'Browser Device Token')}</th>
+                          <th className={`pb-3 ${lang === 'ar' ? 'text-left' : 'text-right'}`}>{text('توقيت تسجيل الدخول والتسجيل بالخادم', 'Server Sign-in Timestamp')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/50">
@@ -3773,8 +4070,8 @@ export default function App() {
                             <td className="py-3 font-mono text-slate-500 text-[10px] max-w-[200px] truncate" title={sess.deviceToken}>
                               {sess.deviceToken}
                             </td>
-                            <td className="py-3 font-mono text-slate-400 text-left">
-                              {new Date(sess.loginTime).toLocaleString('ar-EG')}
+                            <td className={`py-3 font-mono text-slate-400 ${lang === 'ar' ? 'text-left' : 'text-right'}`}>
+                              {new Date(sess.loginTime).toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US')}
                             </td>
                           </tr>
                         ))}
@@ -4140,17 +4437,20 @@ export default function App() {
                             }}
                             className="w-full py-2.5 bg-emerald-600/15 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 hover:border-emerald-600 transition-all text-xs font-bold cursor-pointer"
                           >
-                            إرسال رسالة اختبارية للواتساب 📲
+                            {text('إرسال رسالة اختبارية للواتساب 📲', 'Send Test WhatsApp Message 📲')}
                           </button>
 
                           {/* Beautiful FREE WhatsApp Alternative subcard */}
                           <div className={`mt-4 p-4 rounded-xl border text-xs ${darkMode ? 'bg-emerald-950/20 border-emerald-500/20 text-slate-300' : 'bg-emerald-50 border-emerald-200 text-slate-700'} space-y-2`}>
                             <div className="flex items-center gap-2 text-emerald-400 font-bold">
                               <span className="text-lg">💡</span>
-                              <span>الخيار المجاني بالكامل (بدون أي اشتراك)</span>
+                              <span>{text('الخيار المجاني بالكامل (بدون أي اشتراك)', '100% Free Option (No Subscription)')}</span>
                             </div>
                             <p className="leading-relaxed">
-                              إذا كنت ترغب في توفير التكاليف وتجنب دفع أي رسوم شهرية لبوابة UltraMsg، يمكنك استخدام ميزة **واتساب المجانية** المدمجة في النظام لإرسال التقارير بضغطة زر واحدة مجاناً عبر الهاتف أو الكمبيوتر!
+                              {text(
+                                'إذا كنت ترغب في توفير التكاليف وتجنب دفع أي رسوم شهرية لبوابة UltraMsg، يمكنك استخدام ميزة **واتساب المجانية** المدمجة في النظام لإرسال التقارير بضغطة زر واحدة مجاناً عبر الهاتف أو الكمبيوتر!',
+                                'To save costs and avoid monthly subscription fees, use the integrated Free WhatsApp dispatch feature to share reports with one click via phone or desktop!'
+                              )}
                             </p>
                             <button
                               type="button"
@@ -4158,7 +4458,7 @@ export default function App() {
                               className="w-full mt-2 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-emerald-950/20"
                             >
                               <Smartphone className="w-4 h-4" />
-                              <span>تشغيل الإرسال الفوري المجاني الآن 📲</span>
+                              <span>{text('تشغيل الإرسال الفوري المجاني الآن 📲', 'Launch Free Instant Dispatch 📲')}</span>
                             </button>
                           </div>
                         </div>
@@ -4329,7 +4629,7 @@ export default function App() {
                             }}
                             className="w-full py-2.5 bg-indigo-600/15 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl border border-indigo-500/20 hover:border-indigo-600 transition-all text-xs font-bold cursor-pointer"
                           >
-                            إرسال بريد إلكتروني تجريبي ✉️
+                            {text('إرسال بريد إلكتروني تجريبي ✉️', 'Send Test Email ✉️')}
                           </button>
                           
                           {appsScriptError && (
@@ -4356,7 +4656,7 @@ export default function App() {
                                 onClick={() => setAppsScriptError(null)}
                                 className="text-[10px] text-rose-400/60 hover:text-rose-400 underline font-sans block mt-1"
                               >
-                                تجاهل هذا التنبيه
+                                {text('تجاهل هذا التنبيه', 'Dismiss this notice')}
                               </button>
                             </div>
                           )}
@@ -4442,7 +4742,7 @@ export default function App() {
                         className="px-6 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-teal-900/20 transition-all flex items-center gap-2 cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5 animate-spin-slow" />
-                        حفظ الإعدادات وتأمين البوابات 💾
+                        {text('حفظ الإعدادات وتأمين البوابات 💾', 'Save Settings & Secure Gateways 💾')}
                       </button>
                     </div>
                   </div>
@@ -4458,20 +4758,28 @@ export default function App() {
                   <div>
                     <h2 className="text-xl font-black text-slate-200 flex items-center gap-2">
                       <Shield className="w-6 h-6 text-teal-400" />
-                      سجل التدقيق والمراقبة التاريخية لكل علبة دواء 📋
+                      {t('audit_tab_title')}
                     </h2>
-                    <p className="text-xs text-slate-400">تتبع حركات المخزون، عمليات الصرف، والتسويات اليدوية لضمان الشفافية ومكافحة الهدر والفقد</p>
+                    <p className="text-xs text-slate-400">{t('audit_tab_desc')}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
                         const w = window.open();
                         if (w) {
-                          const tableContent = stockLogs.map(log => `
+                          const isRtl = lang === 'ar';
+                          const tableContent = stockLogs.map(log => {
+                            const actionLabel = isRtl ? log.actionType : (
+                              log.actionType === 'إضافة دواء جديد' ? 'New Medication Added' :
+                              log.actionType === 'صرف دواء لمقيم' ? 'Dispensed to Resident' :
+                              log.actionType === 'حذف دواء' ? 'Medication Deleted' :
+                              'Manual Adjustment'
+                            );
+                            return `
                             <tr>
-                              <td style="padding:10px; border-bottom:1px solid #ddd;">${new Date(log.timestamp).toLocaleString('ar-SA')}</td>
+                              <td style="padding:10px; border-bottom:1px solid #ddd;">${new Date(log.timestamp).toLocaleString(isRtl ? 'ar-SA' : 'en-US')}</td>
                               <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold;">${log.medicineName}</td>
-                              <td style="padding:10px; border-bottom:1px solid #ddd;">${log.actionType}</td>
+                              <td style="padding:10px; border-bottom:1px solid #ddd;">${actionLabel}</td>
                               <td style="padding:10px; border-bottom:1px solid #ddd; font-weight:bold; color: ${log.quantityChanged >= 0 ? 'green' : 'red'};">
                                 ${log.quantityChanged >= 0 ? '+' : ''}${log.quantityChanged}
                               </td>
@@ -4479,23 +4787,24 @@ export default function App() {
                               <td style="padding:10px; border-bottom:1px solid #ddd;">${log.performedByName}</td>
                               <td style="padding:10px; border-bottom:1px solid #ddd;">${log.notes}</td>
                             </tr>
-                          `).join('');
+                          `;
+                          }).join('');
                           
                           w.document.write(`
-                            <div dir="rtl" style="font-family:sans-serif; padding:20px; line-height:1.6;">
-                              <h2 style="text-align:center; color:#0d9488; margin-bottom:5px;">صيدلية مركز الرعاية لذوي الإعاقة</h2>
-                              <h3 style="text-align:center; color:#475569; margin-top:0;">تقرير سجل التدقيق والمراقبة التاريخية للمخزون</h3>
-                              <p style="text-align:left; font-size:12px; color:#64748b;">تاريخ التصدير: ${new Date().toLocaleString('ar-SA')}</p>
-                              <table style="width:100%; border-collapse:collapse; margin-top:20px; text-align:right; font-size:13px;">
+                            <div dir="${isRtl ? 'rtl' : 'ltr'}" style="font-family:sans-serif; padding:20px; line-height:1.6;">
+                              <h2 style="text-align:center; color:#0d9488; margin-bottom:5px;">${isRtl ? 'صيدلية مركز الرعاية لذوي الإعاقة' : 'Special Needs Care Center Pharmacy'}</h2>
+                              <h3 style="text-align:center; color:#475569; margin-top:0;">${isRtl ? 'تقرير سجل التدقيق والمراقبة التاريخية للمخزون' : 'Historical Stock Audit & Ledger Report'}</h3>
+                              <p style="text-align:${isRtl ? 'left' : 'right'}; font-size:12px; color:#64748b;">${isRtl ? 'تاريخ التصدير:' : 'Export Date:'} ${new Date().toLocaleString(isRtl ? 'ar-SA' : 'en-US')}</p>
+                              <table style="width:100%; border-collapse:collapse; margin-top:20px; text-align:${isRtl ? 'right' : 'left'}; font-size:13px;">
                                 <thead style="background-color:#f1f5f9; color:#1e293b;">
                                   <tr>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">التوقيت</th>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">الدواء</th>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">نوع الحركة</th>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">التغيير</th>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">الرصيد الانتقالي</th>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">المسؤول</th>
-                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">ملاحظات الحركة</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'التوقيت' : 'Timestamp'}</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'الدواء' : 'Medication'}</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'نوع الحركة' : 'Action'}</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'التغيير' : 'Change'}</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'الرصيد الانتقالي' : 'Balance'}</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'المسؤول' : 'Auditor'}</th>
+                                    <th style="padding:10px; border-bottom:2px solid #cbd5e1;">${isRtl ? 'ملاحظات الحركة' : 'Notes'}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -4510,7 +4819,7 @@ export default function App() {
                       className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer border border-slate-700"
                     >
                       <Printer className="w-4 h-4" />
-                      طباعة السجل بالكامل 🖨️
+                      {t('audit_print_all')}
                     </button>
                   </div>
                 </div>
@@ -4519,44 +4828,44 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-400">إجمالي الحركات المسجلة</span>
+                      <span className="text-xs font-medium text-slate-400">{t('audit_total_records')}</span>
                       <Activity className="w-4 h-4 text-teal-400" />
                     </div>
                     <div className="text-2xl font-black text-slate-100">{stockLogs.length}</div>
-                    <p className="text-[10px] text-slate-500 mt-1">حركات مدققة وموقعة زمنياً</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{t('audit_total_records_desc')}</p>
                   </div>
 
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-400">عمليات الإضافة المخزنية</span>
+                      <span className="text-xs font-medium text-slate-400">{t('audit_stock_additions')}</span>
                       <Package className="w-4 h-4 text-emerald-400" />
                     </div>
                     <div className="text-2xl font-black text-slate-100">
                       {stockLogs.filter(l => l.actionType === 'إضافة دواء جديد').length}
                     </div>
-                    <p className="text-[10px] text-emerald-500 mt-1">توليد أرصدة افتتاحية وتوريد</p>
+                    <p className="text-[10px] text-emerald-500 mt-1">{t('audit_stock_additions_desc')}</p>
                   </div>
 
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-400">الأدوية المصروفة للمقيمين</span>
+                      <span className="text-xs font-medium text-slate-400">{t('audit_dispensed_stock')}</span>
                       <FileText className="w-4 h-4 text-blue-400" />
                     </div>
                     <div className="text-2xl font-black text-slate-100">
                       {stockLogs.filter(l => l.actionType === 'صرف دواء لمقيم').length}
                     </div>
-                    <p className="text-[10px] text-blue-500 mt-1">صرف دوائي رسمي موثق</p>
+                    <p className="text-[10px] text-blue-500 mt-1">{t('audit_dispensed_stock_desc')}</p>
                   </div>
 
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-400">التسويات والتعديلات اليدوية</span>
+                      <span className="text-xs font-medium text-slate-400">{t('audit_manual_adjustments')}</span>
                       <AlertTriangle className="w-4 h-4 text-amber-400" />
                     </div>
                     <div className="text-2xl font-black text-slate-100">
-                      {stockLogs.filter(l => l.actionType === 'تعديل يدوي').length}
+                      {stockLogs.filter(l => l.actionType === 'تعديل يدوي' || l.actionType?.includes('تسوية يدوية')).length}
                     </div>
-                    <p className="text-[10px] text-amber-500 mt-1">مراقبة الفروقات لتفادي الهدر</p>
+                    <p className="text-[10px] text-amber-500 mt-1">{t('audit_manual_adjustments_desc')}</p>
                   </div>
                 </div>
 
@@ -4567,10 +4876,10 @@ export default function App() {
                   <div className={`p-6 rounded-3xl border h-fit space-y-4 ${darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <h3 className="text-sm font-black text-slate-200 flex items-center gap-1.5">
                       <RefreshCw className="w-4 h-4 text-teal-400" />
-                      تسجيل تسوية جرد يدوية (ضبط رصيد)
+                      {t('audit_adjustment_title')}
                     </h3>
                     <p className="text-xs text-slate-400 leading-relaxed">
-                      هذه الأداة تتيح للصيدلي تعديل كمية أي دواء يدوياً (بالزيادة لتسجيل تبرعات/توريد إضافي، أو بالنقصان لتسجيل أدوية تالفة أو مفقودة)، مع توثيق اسم المسؤول والسبب لمنع الهدر.
+                      {t('audit_adjustment_desc')}
                     </p>
 
                     <form 
@@ -4584,15 +4893,15 @@ export default function App() {
                         const notes = (data.get('notes') as string) || '';
 
                         if (!medicineId) {
-                          showToast('يرجى تحديد الدواء أولاً!', 'error');
+                          showToast(text('يرجى تحديد الدواء أولاً!', 'Please select a medicine first!'), 'error');
                           return;
                         }
                         if (qtyVal <= 0) {
-                          showToast('يرجى إدخال كمية صحيحة أكبر من الصفر!', 'error');
+                          showToast(text('يرجى إدخال كمية صحيحة أكبر من الصفر!', 'Please enter a valid quantity greater than zero!'), 'error');
                           return;
                         }
                         if (!notes.trim()) {
-                          showToast('يرجى كتابة سبب التسوية (ملاحظات التدقيق) لضمان الشفافية!', 'error');
+                          showToast(text('يرجى كتابة سبب التسوية (ملاحظات التدقيق) لضمان الشفافية!', 'Please provide an adjustment reason for audit transparency!'), 'error');
                           return;
                         }
 
@@ -4611,26 +4920,26 @@ export default function App() {
                             notes: `تسوية يدوية (${adjustmentType === 'add' ? 'إضافة' : 'عجز/إتلاف'}): ${notes}`
                           });
                           
-                          showToast('تمت التسوية المخزنية وتحديث رصيد الصنف واللوغ التراكمي بنجاح!', 'success');
+                          showToast(text('تمت التسوية المخزنية وتحديث رصيد الصنف واللوغ التراكمي بنجاح!', 'Stock adjustment saved and ledger trail updated successfully!'), 'success');
                           form.reset();
                           loadAllData();
                         } catch (err) {
-                          showToast('فشلت عملية التسوية اليدوية في السيرفر.', 'error');
+                          showToast(text('فشلت عملية التسوية اليدوية في السيرفر.', 'Failed to save manual adjustment to server.'), 'error');
                         }
                       }}
                       className="space-y-4"
                     >
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-1.5">الدواء المعني بالطبيعة</label>
+                        <label className="block text-xs font-bold text-slate-400 mb-1.5">{t('audit_target_med')}</label>
                         <select 
                           name="medicineId"
                           required
                           className={`w-full px-3.5 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100 focus:border-teal-500' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
                         >
-                          <option value="">-- اختر الدواء المطلوب تسويته --</option>
+                          <option value="">{t('audit_select_med_ph')}</option>
                           {medicines.map(m => (
                             <option key={m.id} value={m.id}>
-                              {m.commercialName} ({m.scientificName}) - الرصيد الحالي: [{m.quantity}]
+                              {m.commercialName} ({m.scientificName}) - {lang === 'ar' ? 'الرصيد الحالي:' : 'Balance:'} [{m.quantity}]
                             </option>
                           ))}
                         </select>
@@ -4638,36 +4947,36 @@ export default function App() {
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="block text-xs font-bold text-slate-400 mb-1.5">نوع التسوية</label>
+                          <label className="block text-xs font-bold text-slate-400 mb-1.5">{t('audit_adj_type')}</label>
                           <select 
                             name="adjustmentType"
                             className={`w-full px-3.5 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
                           >
-                            <option value="subtract">إتلاف / عجز / مفقود (-)</option>
-                            <option value="add">إضافة تبرع / توريد فائض (+)</option>
+                            <option value="subtract">{t('audit_adj_type_sub')}</option>
+                            <option value="add">{t('audit_adj_type_add')}</option>
                           </select>
                         </div>
 
                         <div>
-                          <label className="block text-xs font-bold text-slate-400 mb-1.5">الكمية المعدلة</label>
+                          <label className="block text-xs font-bold text-slate-400 mb-1.5">{t('audit_adj_qty')}</label>
                           <input 
                             type="number"
                             name="quantity"
                             required
                             min="1"
-                            placeholder="عدد الوحدات"
+                            placeholder={t('audit_qty_ph')}
                             className={`w-full px-3.5 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold text-slate-400 mb-1.5">ملاحظات وسبب التعديل (إلزامي للشفافية)</label>
+                        <label className="block text-xs font-bold text-slate-400 mb-1.5">{t('audit_reason_label')}</label>
                         <textarea 
                           name="notes"
                           required
                           rows={3}
-                          placeholder="مثال: تلف الصلاحية، اكتشاف عجز جرد، فائض توريد مركز ذوي الاحتياجات..."
+                          placeholder={t('audit_reason_ph')}
                           className={`w-full px-3.5 py-2 text-xs rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-slate-50 border-slate-200 text-slate-800'}`}
                         />
                       </div>
@@ -4677,7 +4986,7 @@ export default function App() {
                         className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg shadow-teal-950/20"
                       >
                         <RefreshCw className="w-3.5 h-3.5" />
-                        حفظ وتوثيق حركة التسوية 💾
+                        {t('audit_save_adj_btn')}
                       </button>
                     </form>
                   </div>
@@ -4685,75 +4994,84 @@ export default function App() {
                   {/* Right panel (two-thirds): Audit table log */}
                   <div className={`p-6 rounded-3xl border lg:col-span-2 ${darkMode ? 'bg-slate-900/30 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-sm font-black text-slate-200">سجل عمليات التدقيق التاريخية الفوري</h3>
-                      <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-1 rounded-md">تحديث فوري وتوقيع رقمي</span>
+                      <h3 className="text-sm font-black text-slate-200">{t('audit_table_title')}</h3>
+                      <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-1 rounded-md">{t('audit_live_badge')}</span>
                     </div>
 
                     <div className="overflow-x-auto">
-                      <table className="w-full text-right text-xs">
+                      <table className={`w-full text-xs ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                         <thead>
                           <tr className="border-b border-slate-800 text-slate-400 pb-2">
-                            <th className="pb-3 pt-1">التوقيت والحدث</th>
-                            <th className="pb-3 pt-1">الدواء المعني</th>
-                            <th className="pb-3 pt-1 text-center">نوع الحركة</th>
-                            <th className="pb-3 pt-1 text-center">التعديل</th>
-                            <th className="pb-3 pt-1 text-center">الرصيد الانتقالي</th>
-                            <th className="pb-3 pt-1">المسؤول</th>
-                            <th className="pb-3 pt-1">ملاحظات التدقيق والشفافية</th>
+                            <th className="pb-3 pt-1">{t('audit_col_timestamp')}</th>
+                            <th className="pb-3 pt-1">{t('audit_col_med')}</th>
+                            <th className="pb-3 pt-1 text-center">{t('audit_col_action')}</th>
+                            <th className="pb-3 pt-1 text-center">{t('audit_col_change')}</th>
+                            <th className="pb-3 pt-1 text-center">{t('audit_col_balance')}</th>
+                            <th className="pb-3 pt-1">{t('audit_col_user')}</th>
+                            <th className="pb-3 pt-1">{t('audit_col_notes')}</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-800/50">
-                          {stockLogs.map((log) => (
-                            <tr key={log.id} className="hover:bg-slate-800/10 transition-colors">
-                              <td className="py-3">
-                                <div className="font-semibold text-slate-300">
-                                  {new Date(log.timestamp).toLocaleDateString('ar-SA')}
-                                </div>
-                                <div className="text-[10px] text-slate-500">
-                                  {new Date(log.timestamp).toLocaleTimeString('ar-SA')}
-                                </div>
-                              </td>
-                              <td className="py-3">
-                                <div className="font-semibold text-slate-200">{log.medicineName}</div>
-                                <div className="text-[10px] text-slate-500">ID: {log.medicineId}</div>
-                              </td>
-                              <td className="py-3 text-center">
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                  log.actionType === 'إضافة دواء جديد' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                  log.actionType === 'صرف دواء لمقيم' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                  log.actionType === 'حذف دواء' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
-                                  'bg-amber-500/10 text-amber-400 border-amber-500/20'
-                                }`}>
-                                  {log.actionType}
-                                </span>
-                              </td>
-                              <td className="py-3 text-center font-black">
-                                <span className={`flex items-center justify-center gap-1 ${
-                                  log.quantityChanged > 0 ? 'text-emerald-400' :
-                                  log.quantityChanged < 0 ? 'text-rose-400' :
-                                  'text-slate-400'
-                                }`}>
-                                  {log.quantityChanged > 0 && <TrendingUp className="w-3.5 h-3.5" />}
-                                  {log.quantityChanged < 0 && <TrendingDown className="w-3.5 h-3.5" />}
-                                  {log.quantityChanged > 0 ? `+${log.quantityChanged}` : log.quantityChanged}
-                                </span>
-                              </td>
-                              <td className="py-3 text-center text-slate-300 font-mono">
-                                {log.previousQuantity} ➔ {log.newQuantity}
-                              </td>
-                              <td className="py-3">
-                                <div className="font-bold text-slate-200 text-[11px]">{log.performedByName}</div>
-                                <div className="text-[9px] text-slate-500">{log.performedByEmail}</div>
-                              </td>
-                              <td className="py-3 max-w-[200px] truncate text-slate-400 text-[11px]" title={log.notes}>
-                                {log.notes}
-                              </td>
-                            </tr>
-                          ))}
+                          {stockLogs.map((log) => {
+                            const isRtl = lang === 'ar';
+                            const actionBadgeText = isRtl ? log.actionType : (
+                              log.actionType === 'إضافة دواء جديد' ? 'New Medication Added' :
+                              log.actionType === 'صرف دواء لمقيم' ? 'Dispensed to Resident' :
+                              log.actionType === 'حذف دواء' ? 'Medication Deleted' :
+                              'Manual Adjustment'
+                            );
+                            return (
+                              <tr key={log.id} className="hover:bg-slate-800/10 transition-colors">
+                                <td className="py-3">
+                                  <div className="font-semibold text-slate-300">
+                                    {new Date(log.timestamp).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US')}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    {new Date(log.timestamp).toLocaleTimeString(isRtl ? 'ar-SA' : 'en-US')}
+                                  </div>
+                                </td>
+                                <td className="py-3">
+                                  <div className="font-semibold text-slate-200">{log.medicineName}</div>
+                                  <div className="text-[10px] text-slate-500">ID: {log.medicineId}</div>
+                                </td>
+                                <td className="py-3 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                    log.actionType === 'إضافة دواء جديد' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                    log.actionType === 'صرف دواء لمقيم' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                    log.actionType === 'حذف دواء' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' :
+                                    'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                                  }`}>
+                                    {actionBadgeText}
+                                  </span>
+                                </td>
+                                <td className="py-3 text-center font-black">
+                                  <span className={`flex items-center justify-center gap-1 ${
+                                    log.quantityChanged > 0 ? 'text-emerald-400' :
+                                    log.quantityChanged < 0 ? 'text-rose-400' :
+                                    'text-slate-400'
+                                  }`}>
+                                    {log.quantityChanged > 0 && <TrendingUp className="w-3.5 h-3.5" />}
+                                    {log.quantityChanged < 0 && <TrendingDown className="w-3.5 h-3.5" />}
+                                    {log.quantityChanged > 0 ? `+${log.quantityChanged}` : log.quantityChanged}
+                                  </span>
+                                </td>
+                                <td className="py-3 text-center text-slate-300 font-mono">
+                                  {log.previousQuantity} ➔ {log.newQuantity}
+                                </td>
+                                <td className="py-3">
+                                  <div className="font-bold text-slate-200 text-[11px]">{log.performedByName}</div>
+                                  <div className="text-[9px] text-slate-500">{log.performedByEmail}</div>
+                                </td>
+                                <td className="py-3 max-w-[200px] truncate text-slate-400 text-[11px]" title={log.notes}>
+                                  {log.notes}
+                                </td>
+                              </tr>
+                            );
+                          })}
                           {stockLogs.length === 0 && (
                             <tr>
                               <td colSpan={7} className="py-6 text-center text-slate-500 text-xs">
-                                لا توجد حركات تدقيق مسجلة حتى الآن.
+                                {t('audit_no_logs')}
                               </td>
                             </tr>
                           )}
@@ -4771,8 +5089,8 @@ export default function App() {
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                   <div>
-                    <h2 className="text-xl font-black text-slate-200">👥 إدارة المقيمين بمركز الرعاية</h2>
-                    <p className="text-xs text-slate-400">إضافة وتعديل وحذف بيانات نزلاء المركز وتتبع سجلات صرف أدويتهم</p>
+                    <h2 className="text-xl font-black text-slate-200">👥 {text('إدارة المقيمين بمركز الرعاية', 'Special Needs Residents Management')}</h2>
+                    <p className="text-xs text-slate-400">{text('إضافة وتعديل وحذف بيانات نزلاء المركز وتتبع سجلات صرف أدويتهم', 'Register, edit, or delete special needs residents and monitor dosage adherence')}</p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1 sm:flex-initial sm:min-w-[420px]">
@@ -4781,7 +5099,7 @@ export default function App() {
                       <Search className="w-4 h-4 text-slate-400 shrink-0" />
                       <input 
                         type="text"
-                        placeholder="ابحث باسم المقيم، رقم الغرفة، أو الهوية..."
+                        placeholder={text('ابحث باسم المقيم، رقم الغرفة، أو الهوية...', 'Search by resident name, room number, ID...')}
                         value={residentsSearchQuery}
                         onChange={(e) => setResidentsSearchQuery(e.target.value)}
                         className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
@@ -4797,7 +5115,7 @@ export default function App() {
                       className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer whitespace-nowrap"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>إضافة مقيم جديد</span>
+                      <span>{text('إضافة مقيم جديد', 'Register New Resident')}</span>
                     </button>
                   </div>
                 </div>
@@ -4855,11 +5173,11 @@ export default function App() {
                                     onClick={() => {
                                       setActiveDossierResident(res);
                                     }}
-                                    title="عرض الملف الطبي التفاعلي وجدول الجرعات اليومي"
+                                    title={text("عرض الملف الطبي التفاعلي وجدول الجرعات اليومي", "View interactive medical file & daily dosage schedule")}
                                     className="px-2.5 py-1.5 bg-teal-500/10 hover:bg-teal-600 text-teal-400 hover:text-white rounded-lg transition flex items-center gap-1.5 cursor-pointer font-bold text-[10px]"
                                   >
                                     <Activity className="w-3.5 h-3.5" />
-                                    <span>الملف الطبي 🩺</span>
+                                    <span>{text('الملف الطبي 🩺', 'Medical File 🩺')}</span>
                                   </button>
                                   <button 
                                     onClick={() => {
@@ -4905,9 +5223,9 @@ export default function App() {
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div className="space-y-1">
                     <h2 className="text-xl font-black text-slate-200 flex items-center gap-2">
-                      <span>🧠 نظام رصد السلوك والأعراض الجانبية التفاعلي (BCMA Tracker)</span>
+                      <span>🧠 {text('نظام رصد السلوك والأعراض الجانبية التفاعلي (BCMA Tracker)', 'Interactive Behavioral & Side-Effects Log (BCMA)')}</span>
                     </h2>
-                    <p className="text-xs text-slate-400">توثيق ومتابعة التقلبات السلوكية والأعراض الجانبية للأدوية النفسية والعصبية لضمان سلامة مقيمي المركز</p>
+                    <p className="text-xs text-slate-400">{text('توثيق ومتابعة التقلبات السلوكية والأعراض الجانبية للأدوية النفسية والعصبية لضمان سلامة مقيمي المركز', 'Document and monitor behavioral changes and side-effects of psychoactive/neuro medications')}</p>
                   </div>
                   
                   <button 
@@ -4925,42 +5243,42 @@ export default function App() {
                     className="px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>تسجيل ملاحظة سلوكية جديدة</span>
+                    <span>{text('تسجيل ملاحظة سلوكية جديدة', 'Log New Behavioral Entry')}</span>
                   </button>
                 </div>
 
                 {/* Scoreboard widgets */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                   <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
-                    <p className="text-xs font-semibold text-slate-400">إجمالي الملاحظات المرصودة</p>
+                    <p className="text-xs font-semibold text-slate-400">{text('إجمالي الملاحظات المرصودة', 'Total Observed Entries')}</p>
                     <div className="mt-2 text-2xl font-black font-mono tracking-tight text-teal-500">
                       {behaviorLogs.length}
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1">تقارير كادر التمريض والرعاية</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{text('تقارير كادر التمريض والرعاية', 'Nursing & Care Staff Reports')}</p>
                   </div>
 
                   <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
-                    <p className="text-xs font-semibold text-slate-400">الحالات المستقرة والطبيعية 🟢</p>
+                    <p className="text-xs font-semibold text-slate-400">{text('الحالات المستقرة والطبيعية 🟢', 'Stable & Normal States 🟢')}</p>
                     <div className="mt-2 text-2xl font-black font-mono tracking-tight text-emerald-400">
                       {behaviorLogs.filter(b => b.behaviorRating === 'stable').length}
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1">سلوك عام مستقر وضمن الحدود</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{text('سلوك عام مستقر وضمن الحدود', 'General stable behavior within limits')}</p>
                   </div>
 
                   <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
-                    <p className="text-xs font-semibold text-slate-400">حالات القلق والهياج السلوكي ⚠️</p>
+                    <p className="text-xs font-semibold text-slate-400">{text('حالات القلق والهياج السلوكي ⚠️', 'Anxiety & Agitation Cases ⚠️')}</p>
                     <div className="mt-2 text-2xl font-black font-mono tracking-tight text-amber-500">
                       {behaviorLogs.filter(b => ['agitated', 'anxious', 'hyperactive'].includes(b.behaviorRating)).length}
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1">تتطلب مراجعة الجرعات والهدوء</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{text('تتطلب مراجعة الجرعات والهدوء', 'Requires dosage review & calm environment')}</p>
                   </div>
 
                   <div className={`p-4 rounded-2xl border transition-all ${darkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
-                    <p className="text-xs font-semibold text-slate-400">أعراض جانبية حادة 🔴</p>
+                    <p className="text-xs font-semibold text-slate-400">{text('أعراض جانبية حادة 🔴', 'Severe Side Effects 🔴')}</p>
                     <div className="mt-2 text-2xl font-black font-mono tracking-tight text-rose-500">
                       {behaviorLogs.filter(b => b.severity === 'severe').length}
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1">حالات تتطلب تدخل الطبيب فوراً</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{text('حالات تتطلب تدخل الطبيب فوراً', 'Requires immediate physician intervention')}</p>
                   </div>
                 </div>
 
@@ -4971,12 +5289,12 @@ export default function App() {
                   <div className={`p-5 rounded-3xl border ${darkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'}`}>
                     <h3 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-1.5">
                       <Activity className="w-4 h-4 text-teal-400" />
-                      <span>تحليل الحالات السلوكية المرصودة</span>
+                      <span>{text('تحليل الحالات السلوكية المرصودة', 'Observed Behavior Analysis')}</span>
                     </h3>
                     
                     <div className="h-44 w-full flex items-center justify-center" dir="ltr">
                       {getBehaviorChartData().length === 0 ? (
-                        <span className="text-xs text-slate-500">لا توجد بيانات سلوكية كافية للتحليل</span>
+                        <span className="text-xs text-slate-500">{text('لا توجد بيانات سلوكية كافية للتحليل', 'No sufficient behavioral data for analysis')}</span>
                       ) : (
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -4999,7 +5317,7 @@ export default function App() {
                                 borderColor: darkMode ? '#1e293b' : '#cbd5e1',
                                 borderRadius: '12px',
                                 fontSize: '11px',
-                                textAlign: 'right'
+                                textAlign: lang === 'ar' ? 'right' : 'left'
                               }}
                             />
                           </PieChart>
@@ -5007,14 +5325,14 @@ export default function App() {
                       )}
                     </div>
 
-                    <div className="space-y-2 mt-2" dir="rtl">
+                    <div className="space-y-2 mt-2" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
                       {getBehaviorChartData().map((item: any, idx: number) => (
                         <div key={idx} className="flex items-center justify-between text-xs">
                           <div className="flex items-center gap-2">
                             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                             <span className="text-slate-300 font-semibold">{item.name}</span>
                           </div>
-                          <span className="font-mono text-slate-400">{item.value} مرات رصد</span>
+                          <span className="font-mono text-slate-400">{item.value} {text('مرات رصد', 'entries')}</span>
                         </div>
                       ))}
                     </div>
@@ -5031,10 +5349,10 @@ export default function App() {
                         <Search className="w-4 h-4 text-slate-400 shrink-0" />
                         <input 
                           type="text"
-                          placeholder="ابحث باسم المقيم أو تفاصيل الملاحظة..."
+                          placeholder={text("ابحث باسم المقيم أو تفاصيل الملاحظة...", "Search by resident name or note details...")}
                           value={behaviorSearchQuery}
                           onChange={(e) => setBehaviorSearchQuery(e.target.value)}
-                          className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
+                          className={`bg-transparent border-none outline-none ${lang === 'ar' ? 'pr-2.5' : 'pl-2.5'} w-full text-xs font-semibold`}
                         />
                       </div>
 
@@ -5044,12 +5362,12 @@ export default function App() {
                         onChange={(e) => setFilterBehavior(e.target.value)}
                         className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
                       >
-                        <option value="all">كل الحالات السلوكية</option>
-                        <option value="stable">مستقر 🟢</option>
-                        <option value="agitated">هياج سلوكي 🔴</option>
-                        <option value="anxious">قلق وتوتر 🟡</option>
-                        <option value="withdrawn">انسحاب اجتماعي 🟣</option>
-                        <option value="hyperactive">نشاط مفرط 🔵</option>
+                        <option value="all">{text('كل الحالات السلوكية', 'All Behavioral States')}</option>
+                        <option value="stable">{text('مستقر 🟢', 'Stable 🟢')}</option>
+                        <option value="agitated">{text('هياج سلوكي 🔴', 'Agitation 🔴')}</option>
+                        <option value="anxious">{text('قلق وتوتر 🟡', 'Anxiety 🟡')}</option>
+                        <option value="withdrawn">{text('انسحاب اجتماعي 🟣', 'Social Withdrawal 🟣')}</option>
+                        <option value="hyperactive">{text('نشاط مفرط 🔵', 'Hyperactive 🔵')}</option>
                       </select>
 
                       <select
@@ -5057,17 +5375,17 @@ export default function App() {
                         onChange={(e) => setFilterSeverity(e.target.value)}
                         className={`px-3 py-2 text-xs font-semibold rounded-xl border ${darkMode ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-white border-slate-200'}`}
                       >
-                        <option value="all">كل مستويات الأعراض</option>
-                        <option value="none">بدون عرض جانبي ✅</option>
-                        <option value="mild">طفيف 🟢</option>
-                        <option value="moderate">متوسط 🟡</option>
-                        <option value="severe">حاد وخطير 🔴</option>
+                        <option value="all">{text('كل مستويات الأعراض', 'All Severity Levels')}</option>
+                        <option value="none">{text('بدون عرض جانبي ✅', 'No Side Effects ✅')}</option>
+                        <option value="mild">{text('طفيف 🟢', 'Mild 🟢')}</option>
+                        <option value="moderate">{text('متوسط 🟡', 'Moderate 🟡')}</option>
+                        <option value="severe">{text('حاد وخطير 🔴', 'Severe & Acute 🔴')}</option>
                       </select>
 
                     </div>
 
                     {/* Behavior log lists */}
-                    <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                    <div className={`space-y-4 max-h-[50vh] overflow-y-auto ${lang === 'ar' ? 'pr-1' : 'pl-1'}`}>
                       {behaviorLogs.filter(log => {
                         const matchesSearch = log.residentName.toLowerCase().includes(behaviorSearchQuery.toLowerCase()) ||
                                               log.notes.toLowerCase().includes(behaviorSearchQuery.toLowerCase()) ||
@@ -5078,7 +5396,7 @@ export default function App() {
                       }).length === 0 ? (
                         <div className="text-center py-16 bg-slate-900/20 rounded-3xl border border-dashed border-slate-800 text-slate-400 text-xs space-y-2">
                           <HelpCircle className="w-8 h-8 text-slate-600 mx-auto" />
-                          <p>لا توجد ملاحظات سلوكية تطابق خيارات الفرز والبحث المحددة.</p>
+                          <p>{text('لا توجد ملاحظات سلوكية تطابق خيارات الفرز والبحث المحددة.', 'No behavioral observations match the search and filter criteria.')}</p>
                         </div>
                       ) : (
                         behaviorLogs.filter(log => {
@@ -5091,27 +5409,27 @@ export default function App() {
                         }).map((log) => {
                           // Labels & Badges helper
                           const behaviorLabels: Record<string, { label: string, color: string }> = {
-                            stable: { label: 'مستقر وضمن الحدود الطبيعية 🟢', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-                            agitated: { label: 'هياج سلوكي حاد 🔴', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' },
-                            anxious: { label: 'قلق وتوتر نفسى 🟡', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-                            withdrawn: { label: 'انسحاب وعزلة اجتماعية 🟣', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
-                            hyperactive: { label: 'نشاط وحركة مفرطة 🔵', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' }
+                            stable: { label: text('مستقر وضمن الحدود الطبيعية 🟢', 'Stable & within normal limits 🟢'), color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
+                            agitated: { label: text('هياج سلوكي حاد 🔴', 'Acute Agitation / Distress 🔴'), color: 'bg-rose-500/10 text-rose-400 border-rose-500/20 animate-pulse' },
+                            anxious: { label: text('قلق وتوتر نفسي 🟡', 'Anxiety & Tension 🟡'), color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
+                            withdrawn: { label: text('انسحاب وعزلة اجتماعية 🟣', 'Social Withdrawal / Isolation 🟣'), color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+                            hyperactive: { label: text('نشاط وحركة مفرطة 🔵', 'Hyperactivity & Restlessness 🔵'), color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' }
                           };
 
                           const severityLabels: Record<string, { label: string, color: string }> = {
-                            none: { label: 'لا توجد أعراض جانبية ✅', color: 'text-slate-400' },
-                            mild: { label: 'عرض جانبي طفيف', color: 'text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg' },
-                            moderate: { label: 'عرض جانبي متوسط ⚠️', color: 'text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg font-bold' },
-                            severe: { label: 'عرض جانبي حاد وخطير 🚨', color: 'text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-lg font-black animate-pulse' }
+                            none: { label: text('لا توجد أعراض جانبية ✅', 'No adverse effects reported ✅'), color: 'text-slate-400' },
+                            mild: { label: text('عرض جانبي طفيف', 'Mild adverse effect'), color: 'text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-lg' },
+                            moderate: { label: text('عرض جانبي متوسط ⚠️', 'Moderate adverse effect ⚠️'), color: 'text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg font-bold' },
+                            severe: { label: text('عرض جانبي حاد وخطير 🚨', 'Severe & acute adverse effect 🚨'), color: 'text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-lg font-black animate-pulse' }
                           };
 
-                          const sideEffectLabels: Record<string, string> = {
-                            drowsiness: 'خمول ونعاس 😴',
-                            appetite_loss: 'فقدان شهية 🍽️',
-                            tremors: 'ارتعاش ورجفة 🫨',
-                            rash: 'طفح جلدي وحكة 🔴',
-                            nausea: 'غثيان واضطراب 🤢',
-                            insomnia: 'أرق وصعوبة نوم ⏰'
+                          const defaultSideEffectTranslations: Record<string, { ar: string, en: string }> = {
+                            drowsiness: { ar: 'خمول ونعاس 😴', en: 'Drowsiness / Lethargy 😴' },
+                            appetite_loss: { ar: 'فقدان شهية 🍽️', en: 'Appetite Loss 🍽️' },
+                            tremors: { ar: 'ارتعاش ورجفة 🫨', en: 'Tremors / Shaking 🫨' },
+                            rash: { ar: 'طفح جلدي وحكة 🔴', en: 'Skin Rash / Itch 🔴' },
+                            nausea: { ar: 'غثيان واضطراب 🤢', en: 'Nausea / GI Distress 🤢' },
+                            insomnia: { ar: 'أرق وصعوبة نوم ⏰', en: 'Insomnia / Sleep Issues ⏰' }
                           };
 
                           return (
@@ -5126,7 +5444,7 @@ export default function App() {
                               
                               {/* Header info */}
                               <div className="flex justify-between items-start gap-4">
-                                <div className="space-y-1 text-right">
+                                <div className={`space-y-1 ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                                   <div className="flex items-center gap-2">
                                     <h4 className="text-sm font-black text-slate-200">{log.residentName}</h4>
                                     <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-bold border ${behaviorLabels[log.behaviorRating]?.color || ''}`}>
@@ -5134,7 +5452,7 @@ export default function App() {
                                     </span>
                                   </div>
                                   <p className="text-[10px] text-slate-500">
-                                    بواسطة: <strong className="text-slate-400">{log.loggedBy}</strong> · في تاربخ: <span className="font-mono">{new Date(log.loggedAt).toLocaleString('ar-EG')}</span>
+                                    {text('بواسطة:', 'By:')} <strong className="text-slate-400">{log.loggedBy}</strong> · {text('في تاريخ:', 'Date:')} <span className="font-mono">{new Date(log.loggedAt).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')}</span>
                                   </p>
                                 </div>
                                 
@@ -5153,10 +5471,10 @@ export default function App() {
                                       setShowAddBehaviorModal(true);
                                     }}
                                     className="px-2.5 py-1.5 rounded-lg bg-teal-600/10 hover:bg-teal-600 text-teal-400 hover:text-white transition cursor-pointer flex items-center gap-1 text-[10px] font-bold"
-                                    title="تعديل هذا السجل"
+                                    title={text("تعديل هذا السجل", "Edit this record")}
                                   >
                                     <Edit2 className="w-3 h-3" />
-                                    <span>تعديل ✏️</span>
+                                    <span>{text('تعديل ✏️', 'Edit ✏️')}</span>
                                   </button>
 
                                   <button 
@@ -5164,10 +5482,10 @@ export default function App() {
                                       setDeleteConfirmTarget({ id: log.id, name: log.residentName, type: 'behaviorLog' });
                                     }}
                                     className="px-2.5 py-1.5 rounded-lg bg-rose-600/10 hover:bg-rose-600 text-rose-400 hover:text-white transition cursor-pointer flex items-center gap-1 text-[10px] font-bold"
-                                    title="حذف هذا السجل"
+                                    title={text("حذف هذا السجل", "Delete this record")}
                                   >
                                     <Trash2 className="w-3 h-3" />
-                                    <span>حذف 🗑️</span>
+                                    <span>{text('حذف 🗑️', 'Delete 🗑️')}</span>
                                   </button>
                                 </div>
                               </div>
@@ -5175,11 +5493,11 @@ export default function App() {
                               {/* Suspected medicine banner */}
                               {log.recentMedicineId && (
                                 <div className="px-3 py-2 bg-slate-950/40 rounded-xl border border-slate-800 flex items-center justify-between text-[11px]">
-                                  <span className="text-slate-400">الدواء المشتبه بتأثيره الجانبي:</span>
+                                  <span className="text-slate-400">{text('الدواء المشتبه بتأثيره الجانبي:', 'Suspected Adverse Medication:')}</span>
                                   <span className="font-bold text-teal-400">
                                     {log.recentMedicineName}
                                     {medicines.find(m => m.id === log.recentMedicineId)?.scientificName && (
-                                      <span className="text-[10px] text-slate-500 mr-1 font-mono">({medicines.find(m => m.id === log.recentMedicineId)?.scientificName})</span>
+                                      <span className={`text-[10px] text-slate-500 ${lang === 'ar' ? 'mr-1' : 'ml-1'} font-mono`}>({medicines.find(m => m.id === log.recentMedicineId)?.scientificName})</span>
                                     )}
                                   </span>
                                 </div>
@@ -5187,19 +5505,19 @@ export default function App() {
 
                               {/* Registered Side Effects */}
                               <div className="flex flex-wrap items-center gap-2 pt-1">
-                                <span className="text-slate-500 text-[10px]">الأعراض الجانبية:</span>
+                                <span className="text-slate-500 text-[10px]">{text('الأعراض الجانبية:', 'Side Effects:')}</span>
                                 {(!log.sideEffects || log.sideEffects.length === 0) ? (
-                                  <span className="text-slate-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">سليم، لا توجد أعراض ✅</span>
+                                  <span className="text-slate-400 font-bold bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10">{text('سليم، لا توجد أعراض ✅', 'Clear, no adverse effects reported ✅')}</span>
                                 ) : (
                                   log.sideEffects.map((se: string) => (
                                     <span key={se} className="px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300 text-[10px] font-medium">
-                                      {customSideEffects.find(x => x.key === se)?.label || sideEffectLabels[se] || se}
+                                      {defaultSideEffectTranslations[se] ? (lang === 'ar' ? defaultSideEffectTranslations[se].ar : defaultSideEffectTranslations[se].en) : (customSideEffects.find(x => x.key === se)?.label || se)}
                                     </span>
                                   ))
                                 )}
                                 
-                                <div className="mr-auto shrink-0 flex items-center gap-1">
-                                  <span className="text-[10px] text-slate-500">شدة العرض:</span>
+                                <div className={`${lang === 'ar' ? 'mr-auto' : 'ml-auto'} shrink-0 flex items-center gap-1`}>
+                                  <span className="text-[10px] text-slate-500">{text('شدة العرض:', 'Severity:')}</span>
                                   <span className={`text-[10px] font-bold ${severityLabels[log.severity]?.color || ''}`}>
                                     {severityLabels[log.severity]?.label || log.severity}
                                   </span>
@@ -5207,8 +5525,8 @@ export default function App() {
                               </div>
 
                               {/* Clinical comments notes */}
-                              <div className="p-3 bg-slate-950/30 rounded-xl border border-slate-850 text-slate-300 leading-relaxed text-[11px] text-right font-sans whitespace-pre-line">
-                                <span className="font-semibold text-slate-400 block mb-0.5">📝 التفاصيل السلوكية والتقرير الطبي:</span>
+                              <div className={`p-3 bg-slate-950/30 rounded-xl border border-slate-850 text-slate-300 leading-relaxed text-[11px] font-sans whitespace-pre-line ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
+                                <span className="font-semibold text-slate-400 block mb-0.5">📝 {text('التفاصيل السلوكية والتقرير الطبي:', 'Behavioral Details & Clinical Observation:')}</span>
                                 {log.notes}
                               </div>
 
@@ -5230,8 +5548,8 @@ export default function App() {
               <div className="space-y-6 animate-fade-in">
                 <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4">
                   <div>
-                    <h2 className="text-xl font-black text-slate-200">👤 إدارة مستخدمي الصيدلية والنظام</h2>
-                    <p className="text-xs text-slate-400">إضافة وتعديل وحذف حسابات الصيادلة والمشرفين بالمركز</p>
+                    <h2 className="text-xl font-black text-slate-200">👤 {text('إدارة مستخدمي الصيدلية والنظام', 'Pharmacy Users & Access Directory')}</h2>
+                    <p className="text-xs text-slate-400">{text('إضافة وتعديل وحذف حسابات الصيادلة والمشرفين بالمركز', 'Register, edit, or delete credentials of pharmacists and medical supervisors')}</p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center flex-1 sm:flex-initial sm:min-w-[420px]">
@@ -5240,7 +5558,7 @@ export default function App() {
                       <Search className="w-4 h-4 text-slate-400 shrink-0" />
                       <input 
                         type="text"
-                        placeholder="ابحث باسم المستخدم، البريد، الدور، الهاتف..."
+                        placeholder={text('ابحث باسم المستخدم، البريد، الدور، الهاتف...', 'Search by user name, email, role, phone...')}
                         value={usersSearchQuery}
                         onChange={(e) => setUsersSearchQuery(e.target.value)}
                         className="bg-transparent border-none outline-none pr-2.5 w-full text-xs font-semibold"
@@ -5256,7 +5574,7 @@ export default function App() {
                       className="px-4 py-2.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg shadow-teal-900/25 cursor-pointer whitespace-nowrap"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>إضافة مستخدم جديد</span>
+                      <span>{text('إضافة مستخدم جديد', 'Add New User')}</span>
                     </button>
                   </div>
                 </div>
@@ -5266,12 +5584,12 @@ export default function App() {
                     <table className="w-full text-right text-xs">
                       <thead>
                         <tr className="border-b border-slate-800 text-slate-400 font-bold">
-                          <th className="pb-3 text-right">الاسم بالكامل</th>
-                          <th className="pb-3 text-right">البريد الإلكتروني</th>
-                          <th className="pb-3 text-right">الدور الصلاحي</th>
-                          <th className="pb-3 text-right">رقم الهاتف</th>
-                          <th className="pb-3 text-right">كلمة المرور المسجلة</th>
-                          <th className="pb-3 text-left">إجراءات</th>
+                          <th className="pb-3 text-right">{text('الاسم بالكامل', 'Full Name')}</th>
+                          <th className="pb-3 text-right">{text('البريد الإلكتروني', 'Email Address')}</th>
+                          <th className="pb-3 text-right">{text('الدور الصلاحي', 'Role / Access')}</th>
+                          <th className="pb-3 text-right">{text('رقم الهاتف', 'Contact Phone')}</th>
+                          <th className="pb-3 text-right">{text('كلمة المرور المسجلة', 'Password')}</th>
+                          <th className="pb-3 text-left">{text('إجراءات', 'Actions')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/40">
@@ -5438,8 +5756,8 @@ export default function App() {
                       />
                     </div>
                     <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/60">
-                      <button type="button" onClick={() => setShowAddResidentModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">إلغاء</button>
-                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">حفظ المقيم</button>
+                      <button type="button" onClick={() => setShowAddResidentModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">{text('إلغاء', 'Cancel')}</button>
+                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">{text('حفظ المقيم', 'Save Resident')}</button>
                     </div>
                   </form>
                 </div>
@@ -5511,8 +5829,8 @@ export default function App() {
                       />
                     </div>
                     <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/60">
-                      <button type="button" onClick={() => setShowEditResidentModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">إلغاء</button>
-                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">تعديل البيانات</button>
+                      <button type="button" onClick={() => setShowEditResidentModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">{text('إلغاء', 'Cancel')}</button>
+                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">{text('تعديل البيانات', 'Save Changes')}</button>
                     </div>
                   </form>
                 </div>
@@ -5546,6 +5864,7 @@ export default function App() {
                       uid: "user-" + Math.random().toString(36).substr(2, 9),
                       ...userForm
                     };
+                    DbService.addUser(newUser);
                     updateUsersList([...users, newUser]);
                     setShowAddUserModal(false);
                     showToast(`تم إنشاء حساب المستخدم "${newUser.name}" بنجاح!`, 'success');
@@ -5601,8 +5920,8 @@ export default function App() {
                       />
                     </div>
                     <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/60">
-                      <button type="button" onClick={() => setShowAddUserModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">إلغاء</button>
-                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">إنشاء الحساب</button>
+                      <button type="button" onClick={() => setShowAddUserModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">{text('إلغاء', 'Cancel')}</button>
+                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">{text('إنشاء الحساب', 'Create Account')}</button>
                     </div>
                   </form>
                 </div>
@@ -5625,6 +5944,8 @@ export default function App() {
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     if (!selectedUserId) return;
+                    const updatedUser = { uid: selectedUserId, ...userForm };
+                    DbService.updateUser(updatedUser);
                     const updated = users.map(u => u.uid === selectedUserId ? { ...u, ...userForm } : u);
                     updateUsersList(updated);
                     setShowEditUserModal(false);
@@ -5677,8 +5998,8 @@ export default function App() {
                       />
                     </div>
                     <div className="flex justify-end gap-2 pt-2 border-t border-slate-800/60">
-                      <button type="button" onClick={() => setShowEditUserModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">إلغاء</button>
-                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">تعديل البيانات</button>
+                      <button type="button" onClick={() => setShowEditUserModal(false)} className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer">{text('إلغاء', 'Cancel')}</button>
+                      <button type="submit" className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold shadow-lg shadow-teal-900/20 cursor-pointer">{text('تعديل البيانات', 'Save Changes')}</button>
                     </div>
                   </form>
                 </div>
@@ -5746,13 +6067,13 @@ export default function App() {
                         <div className="flex justify-between items-center border-b pb-2 border-slate-800/60">
                           <h4 className="font-bold text-teal-400 flex items-center gap-1.5">
                             <Sparkles className="w-4 h-4 animate-pulse text-teal-400" />
-                            <span>تقييم الحالة بالذكاء الاصطناعي السريري 🧠</span>
+                            <span>{text('تقييم الحالة بالذكاء الاصطناعي السريري 🧠', 'Clinical AI Assessment 🧠')}</span>
                           </h4>
-                          <span className="text-[9px] bg-teal-500/10 px-2 py-0.5 rounded-full text-teal-400 font-bold">مجاني وآمن بالكامل 🟢</span>
+                          <span className="text-[9px] bg-teal-500/10 px-2 py-0.5 rounded-full text-teal-400 font-bold">{text('مجاني وآمن بالكامل 🟢', 'Free & 100% Secure 🟢')}</span>
                         </div>
 
                         <p className="text-[11px] text-slate-400 leading-relaxed">
-                          اضغط لتوليد تحليل طبي متكامل يبحث في حساسية المريض، جداول الأدوية النشطة، والتقلبات السلوكية المرصودة أخيراً بالمركز.
+                          {text('اضغط لتوليد تحليل طبي متكامل يبحث في حساسية المريض، جداول الأدوية النشطة، والتقلبات السلوكية المرصودة أخيراً بالمركز.', 'Generate comprehensive clinical analysis evaluating allergies, active prescriptions, and recent behavioral changes.')}
                         </p>
 
                         <button
@@ -5764,22 +6085,22 @@ export default function App() {
                           {aiDossierLoading ? (
                             <>
                               <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                              <span>جاري فحص وتحليل الملف الطبي للمقيم...</span>
+                              <span>{text('جاري فحص وتحليل الملف الطبي للمقيم...', 'Analyzing resident clinical & behavioral file...')}</span>
                             </>
                           ) : (
                             <>
                               <Sparkles className="w-4 h-4 text-white" />
-                              <span>توليد تقييم الحالة السلوكية والطبية الآن ✨</span>
+                              <span>{text('توليد تقييم الحالة السلوكية والطبية الآن ✨', 'Generate Behavioral & Clinical Assessment ✨')}</span>
                             </>
                           )}
                         </button>
 
                         {aiDossierResult && (
-                          <div className="p-4 rounded-xl bg-slate-950 border border-slate-850 animate-fade-in text-right text-xs space-y-3 text-slate-300 max-h-96 overflow-y-auto leading-relaxed">
+                          <div className={`p-4 rounded-xl bg-slate-950 border border-slate-850 animate-fade-in ${lang === 'ar' ? 'text-right' : 'text-left'} text-xs space-y-3 text-slate-300 max-h-96 overflow-y-auto leading-relaxed`}>
                             <div className="flex justify-between items-center border-b border-slate-850 pb-2 mb-1">
                               <span className="font-bold text-teal-400 flex items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
-                                تقرير الذكاء الاصطناعي الجاهز
+                                {text('تقرير الذكاء الاصطناعي الجاهز', 'AI Clinical Report Ready')}
                               </span>
                               <div className="flex gap-2 items-center">
                                 <button
@@ -5791,18 +6112,19 @@ export default function App() {
                                   className="text-[10px] text-teal-400 hover:underline cursor-pointer flex items-center gap-1"
                                 >
                                   <Copy className="w-3 h-3 text-teal-400" />
-                                  <span>نسخ 📋</span>
+                                  <span>{text('نسخ 📋', 'Copy 📋')}</span>
                                 </button>
                                 <span className="text-slate-700" aria-hidden="true">·</span>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     try {
-                                      const reportHeader = `🏥 تقرير التقييم الطبي السريري بالذكاء الاصطناعي\n` +
-                                        `اسم المقيم: ${activeDossierResident.name}\n` +
-                                        `العمر: ${activeDossierResident.age} سنة\n` +
-                                        `رقم الغرفة: ${activeDossierResident.roomNumber}\n` +
-                                        `تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}\n` +
+                                      const isRtl = lang === 'ar';
+                                      const reportHeader = (isRtl ? `🏥 تقرير التقييم الطبي السريري بالذكاء الاصطناعي\n` : `🏥 Clinical AI Medical Dossier Evaluation Report\n`) +
+                                        (isRtl ? `اسم المقيم: ${activeDossierResident.name}\n` : `Resident Name: ${activeDossierResident.name}\n`) +
+                                        (isRtl ? `العمر: ${activeDossierResident.age} سنة\n` : `Age: ${activeDossierResident.age} years\n`) +
+                                        (isRtl ? `رقم الغرفة: ${activeDossierResident.roomNumber}\n` : `Room Number: ${activeDossierResident.roomNumber}\n`) +
+                                        (isRtl ? `تاريخ التقرير: ${new Date().toLocaleString('ar-EG')}\n` : `Report Date: ${new Date().toLocaleString('en-US')}\n`) +
                                         `==========================================\n\n`;
                                       
                                       const fileContent = "\uFEFF" + reportHeader + aiDossierResult;
@@ -5810,58 +6132,59 @@ export default function App() {
                                       const url = URL.createObjectURL(blob);
                                       const link = document.createElement("a");
                                       link.setAttribute("href", url);
-                                      link.setAttribute("download", `تقرير_طبي_${activeDossierResident.name.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('ar-EG').replace(/\//g, '-')}.txt`);
+                                      link.setAttribute("download", `clinical_report_${activeDossierResident.name.replace(/\s+/g, '_')}_${new Date().toLocaleDateString('en-CA')}.txt`);
                                       document.body.appendChild(link);
                                       link.click();
                                       document.body.removeChild(link);
-                                      showToast('📥 تم تصدير التقرير كملف نصي بنجاح!', 'success');
+                                      showToast(text('📥 تم تصدير التقرير كملف نصي بنجاح!', '📥 Medical report exported as text file!'), 'success');
                                     } catch (e) {
-                                      showToast('عذراً، فشل تصدير التقرير الطبي.', 'error');
+                                      showToast(text('عذراً، فشل تصدير التقرير الطبي.', 'Failed to export medical dossier report.'), 'error');
                                     }
                                   }}
                                   className="text-[10px] text-teal-400 hover:underline cursor-pointer flex items-center gap-1"
                                 >
                                   <Download className="w-3 h-3 text-teal-400" />
-                                  <span>تصدير 📥</span>
+                                  <span>{text('تصدير 📥', 'Export 📥')}</span>
                                 </button>
                                 <span className="text-slate-700" aria-hidden="true">·</span>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     if (!activeDossierResident || !aiDossierResult) {
-                                      showToast('لا يوجد تقرير لطباعته.', 'error');
+                                      showToast(text('لا يوجد تقرير لطباعته.', 'No report to print.'), 'error');
                                       return;
                                     }
                                     const w = window.open();
                                     if (w) {
+                                      const isRtl = lang === 'ar';
                                       w.document.write(`
-                                        <div dir="rtl" style="font-family:sans-serif; padding:30px; line-height:1.6; text-align:right; direction: rtl;">
+                                        <div dir="${isRtl ? 'rtl' : 'ltr'}" style="font-family:sans-serif; padding:30px; line-height:1.6; text-align:${isRtl ? 'right' : 'left'};">
                                           <div style="text-align: center; margin-bottom: 30px;">
-                                            <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #0d9488;">صيدلية مركز رعاية ذوي الإعاقة</h1>
-                                            <p style="margin: 5px 0; font-size: 16px; font-weight: bold; color: #475569;">تقرير التقييم الطبي السريري المتقدم (ذكاء اصطناعي)</p>
-                                            <p style="font-size: 11px; color: #666;">تاريخ ترحيل التقرير: ${new Date().toLocaleString('ar-EG')}</p>
+                                            <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #0d9488;">${isRtl ? 'صيدلية مركز رعاية ذوي الإعاقة' : 'Special Needs Care Center Pharmacy'}</h1>
+                                            <p style="margin: 5px 0; font-size: 16px; font-weight: bold; color: #475569;">${isRtl ? 'تقرير التقييم الطبي السريري المتقدم (ذكاء اصطناعي)' : 'Advanced Clinical AI Evaluation Report'}</p>
+                                            <p style="font-size: 11px; color: #666;">${isRtl ? 'تاريخ التقرير:' : 'Report Date:'} ${new Date().toLocaleString(isRtl ? 'ar-EG' : 'en-US')}</p>
                                           </div>
 
                                           <div style="margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; background-color: #f8fafc; padding: 15px; border-radius: 8px;">
-                                            <h3 style="margin: 0 0 10px 0; color: #0f172a; font-size: 15px;">معلومات المقيم الطبية والسريرية:</h3>
-                                            <p style="margin: 4px 0; font-size: 13px;">اسم المقيم: <strong>${activeDossierResident.name}</strong></p>
-                                            <p style="margin: 4px 0; font-size: 13px;">العمر: <strong>${activeDossierResident.age} سنة</strong></p>
-                                            <p style="margin: 4px 0; font-size: 13px;">رقم الغرفة/الجناح: <strong>${activeDossierResident.roomNumber}</strong></p>
-                                            <p style="margin: 4px 0; font-size: 13px;">الحساسية المسجلة: <strong style="color: #b91c1c;">${activeDossierResident.allergies || 'لا توجد'}</strong></p>
+                                            <h3 style="margin: 0 0 10px 0; color: #0f172a; font-size: 15px;">${isRtl ? 'معلومات المقيم الطبية والسريرية:' : 'Resident Clinical Information:'}</h3>
+                                            <p style="margin: 4px 0; font-size: 13px;">${isRtl ? 'اسم المقيم:' : 'Resident Name:'} <strong>${activeDossierResident.name}</strong></p>
+                                            <p style="margin: 4px 0; font-size: 13px;">${isRtl ? 'العمر:' : 'Age:'} <strong>${activeDossierResident.age} ${isRtl ? 'سنة' : 'years'}</strong></p>
+                                            <p style="margin: 4px 0; font-size: 13px;">${isRtl ? 'رقم الغرفة/الجناح:' : 'Room/Suite:'} <strong>${activeDossierResident.roomNumber}</strong></p>
+                                            <p style="margin: 4px 0; font-size: 13px;">${isRtl ? 'الحساسية المسجلة:' : 'Recorded Allergies:'} <strong style="color: #b91c1c;">${activeDossierResident.allergies || (isRtl ? 'لا توجد' : 'None')}</strong></p>
                                           </div>
 
-                                          <h3 style="margin-top: 20px; margin-bottom: 10px; color: #0f172a; font-size: 15px;">محتوى تقرير التقييم والتحليل السريري:</h3>
+                                          <h3 style="margin-top: 20px; margin-bottom: 10px; color: #0f172a; font-size: 15px;">${isRtl ? 'محتوى تقرير التقييم والتحليل السريري:' : 'Evaluation & Clinical Analysis Content:'}</h3>
                                           <div style="white-space: pre-line; font-size: 13px; line-height: 1.6; margin-top: 10px; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px; background-color: #fdfdfd; color: #334155;">
                                             ${aiDossierResult}
                                           </div>
 
                                           <div style="margin-top: 60px; display: flex; justify-content: space-between;">
-                                            <div style="text-align: right;">
-                                              <p style="margin: 0; font-weight: bold;">توقيع الصيدلي واللجنة الطبية السريرية:</p>
+                                            <div style="text-align: ${isRtl ? 'right' : 'left'};">
+                                              <p style="margin: 0; font-weight: bold;">${isRtl ? 'توقيع الصيدلي واللجنة الطبية السريرية:' : 'Clinical Pharmacist Signature:'}</p>
                                               <p style="margin-top: 50px;">___________________</p>
                                             </div>
-                                            <div style="text-align: right;">
-                                              <p style="margin: 0; font-weight: bold;">اعتماد إدارة مركز الرعاية والخدمات الطبية:</p>
+                                            <div style="text-align: ${isRtl ? 'right' : 'left'};">
+                                              <p style="margin: 0; font-weight: bold;">${isRtl ? 'اعتماد إدارة مركز الرعاية والخدمات الطبية:' : 'Center Administration Approval:'}</p>
                                               <p style="margin-top: 50px;">___________________</p>
                                             </div>
                                           </div>
@@ -5870,28 +6193,28 @@ export default function App() {
                                       w.document.close();
                                       w.focus();
                                       w.print();
-                                      showToast('تم فتح أمر الطباعة للتقرير السريري بنجاح 🖨️', 'success');
+                                      showToast(text('تم فتح أمر الطباعة للتقرير السريري بنجاح 🖨️', 'Print dialog launched successfully 🖨️'), 'success');
                                     } else {
-                                      showToast('عذراً، تم حظر النافذة المنبثقة للطباعة من قبل المتصفح.', 'error');
+                                      showToast(text('عذراً، تم حظر النافذة المنبثقة للطباعة من قبل المتصفح.', 'Popup blocked by browser.'), 'error');
                                     }
                                   }}
                                   className="text-[10px] text-teal-400 hover:underline cursor-pointer flex items-center gap-1"
                                 >
                                   <Printer className="w-3 h-3 text-teal-400" />
-                                  <span>طباعة 🖨️</span>
+                                  <span>{text('طباعة 🖨️', 'Print 🖨️')}</span>
                                 </button>
                                 <span className="text-slate-700" aria-hidden="true">·</span>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     setAiDossierResult(null);
-                                    showToast('تم إغلاق تقرير التقييم بنجاح.', 'success');
+                                    showToast(text('تم إغلاق تقرير التقييم بنجاح.', 'Evaluation report closed.'), 'success');
                                   }}
                                   className="text-[10px] text-rose-400 hover:underline cursor-pointer flex items-center gap-1 font-bold"
-                                  title="خروج وإغلاق التقرير"
+                                  title={text("خروج وإغلاق التقرير", "Close Report")}
                                 >
                                   <X className="w-3 h-3 text-rose-400" />
-                                  <span>خروج ❌</span>
+                                  <span>{text('خروج ❌', 'Close ❌')}</span>
                                 </button>
                               </div>
                             </div>
@@ -5966,7 +6289,7 @@ export default function App() {
                             className="w-full py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl shadow-lg shadow-teal-900/20 transition-all flex items-center justify-center gap-1 cursor-pointer"
                           >
                             <Plus className="w-4 h-4" />
-                            <span>إضافة وجدولة الجرعة الآن</span>
+                            <span>{text('إضافة وجدولة الجرعة الآن', 'Schedule Dose Now')}</span>
                           </button>
                         </form>
                       </div>
@@ -6137,7 +6460,7 @@ export default function App() {
 
                                       <button 
                                         onClick={() => removeDoseFromResidentSchedule(activeDossierResident.id, dose.id)}
-                                        title="إزالة الجرعة من الجدول"
+                                        title={text("إزالة الجرعة من الجدول", "Remove dose from schedule")}
                                         className="p-1.5 bg-slate-800 hover:bg-rose-950 hover:text-rose-400 text-slate-400 rounded-lg transition cursor-pointer"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
@@ -6163,7 +6486,7 @@ export default function App() {
                       onClick={() => setActiveDossierResident(null)} 
                       className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold text-xs cursor-pointer"
                     >
-                      إغلاق الملف
+                      {text('إغلاق الملف', 'Close Dossier')}
                     </button>
                   </div>
 
@@ -6173,23 +6496,23 @@ export default function App() {
 
             {/* ----------------- CUSTOM DELETE CONFIRMATION MODAL ----------------- */}
             {deleteConfirmTarget && (
-              <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" dir="rtl">
-                <div className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 text-right ${darkMode ? 'bg-slate-900 border-rose-900/30' : 'bg-white border-slate-200 text-slate-900'}`}>
+              <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                <div className={`w-full max-w-md rounded-3xl border shadow-2xl p-6 ${lang === 'ar' ? 'text-right' : 'text-left'} ${darkMode ? 'bg-slate-900 border-rose-900/30' : 'bg-white border-slate-200 text-slate-900'}`}>
                   <div className="flex justify-between items-center pb-3 border-b border-rose-500/10 mb-4">
                     <h3 className="text-sm font-black text-rose-500 flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-rose-500 animate-pulse" />
-                      <span>تأكيد إجراء الحذف النهائي ⚠️</span>
+                      <span>{text('تأكيد إجراء الحذف النهائي ⚠️', 'Confirm Permanent Deletion ⚠️')}</span>
                     </h3>
                   </div>
                   <p className="text-xs text-slate-400 mb-6 leading-relaxed">
                     {deleteConfirmTarget.type === 'resident' ? (
-                      <span>هل أنت متأكد تماماً من شطب المقيم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من سجلات الصيدلية والمركز؟ هذا الإجراء سيؤثر على ربط سجلات الصرف القديمة.</span>
+                      <span>{text('هل أنت متأكد تماماً من شطب المقيم ', 'Are you sure you want to delete resident ')}<strong className="text-teal-400">{deleteConfirmTarget.name}</strong>{text(' نهائياً من سجلات الصيدلية والمركز؟ هذا الإجراء سيؤثر على ربط سجلات الصرف القديمة.', ' permanently from pharmacy records? This will affect historical dispense records.')}</span>
                     ) : deleteConfirmTarget.type === 'user' ? (
-                      <span>هل أنت متأكد تماماً من إلغاء حساب المستخدم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> وحظر وصوله إلى نظام الصيدلية؟</span>
+                      <span>{text('هل أنت متأكد تماماً من إلغاء حساب المستخدم ', 'Are you sure you want to delete user ')}<strong className="text-teal-400">{deleteConfirmTarget.name}</strong>{text(' وحظر وصوله إلى نظام الصيدلية؟', ' and revoke access to the pharmacy system?')}</span>
                     ) : deleteConfirmTarget.type === 'company' ? (
-                      <span>هل أنت متأكد تماماً من شطب شركة الأدوية <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من دليل شركات التوريد والإنتاج؟</span>
+                      <span>{text('هل أنت متأكد تماماً من شطب شركة الأدوية ', 'Are you sure you want to delete pharma company ')}<strong className="text-teal-400">{deleteConfirmTarget.name}</strong>{text(' نهائياً من دليل شركات التوريد والإنتاج؟', ' from the supplier directory?')}</span>
                     ) : (
-                      <span>هل أنت متأكد تماماً من حذف الملاحظة السلوكية والطبية المسجلة للمقيم <strong className="text-teal-400">{deleteConfirmTarget.name}</strong> نهائياً من نظام التتبع السلوكي؟</span>
+                      <span>{text('هل أنت متأكد تماماً من حذف الملاحظة السلوكية والطبية المسجلة للمقيم ', 'Are you sure you want to delete the behavioral observation for resident ')}<strong className="text-teal-400">{deleteConfirmTarget.name}</strong>{text(' نهائياً من نظام التتبع السلوكي؟', ' permanently from the behavioral tracking system?')}</span>
                     )}
                   </p>
                   <div className="flex justify-end gap-2 text-xs">
@@ -6198,7 +6521,7 @@ export default function App() {
                       onClick={() => setDeleteConfirmTarget(null)} 
                       className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold cursor-pointer"
                     >
-                      إلغاء التراجع
+                      {text('إلغاء التراجع', 'Cancel')}
                     </button>
                     <button 
                       type="button" 
@@ -6206,26 +6529,27 @@ export default function App() {
                         if (deleteConfirmTarget.type === 'resident') {
                           const updated = residents.filter(r => r.id !== deleteConfirmTarget.id);
                           updateResidentsList(updated);
-                          showToast(`تم شطب المقيم "${deleteConfirmTarget.name}" بنجاح.`, 'success');
+                          showToast(text(`تم شطب المقيم "${deleteConfirmTarget.name}" بنجاح.`, `Resident "${deleteConfirmTarget.name}" removed successfully.`), 'success');
                         } else if (deleteConfirmTarget.type === 'user') {
+                          DbService.deleteUser(deleteConfirmTarget.id);
                           const updated = users.filter(u => u.uid !== deleteConfirmTarget.id);
                           updateUsersList(updated);
-                          showToast(`تم إلغاء حساب الكادر الطبي "${deleteConfirmTarget.name}" بنجاح.`, 'success');
+                          showToast(text(`تم إلغاء حساب الكادر الطبي "${deleteConfirmTarget.name}" بنجاح.`, `User "${deleteConfirmTarget.name}" removed successfully.`), 'success');
                         } else if (deleteConfirmTarget.type === 'company') {
                           const updated = companies.filter(c => c.id !== deleteConfirmTarget.id);
                           setCompanies(updated);
                           localStorage.setItem('care_pharmacy_companies', JSON.stringify(updated));
-                          showToast(`تم حذف شركة "${deleteConfirmTarget.name}" بنجاح.`, 'success');
+                          showToast(text(`تم حذف شركة "${deleteConfirmTarget.name}" بنجاح.`, `Company "${deleteConfirmTarget.name}" removed successfully.`), 'success');
                         } else if (deleteConfirmTarget.type === 'behaviorLog') {
                           const updated = behaviorLogs.filter(b => b.id !== deleteConfirmTarget.id);
                           updateBehaviorLogs(updated);
-                          showToast(`تم حذف السجل السلوكي للمريض "${deleteConfirmTarget.name}" بنجاح.`, 'success');
+                          showToast(text(`تم حذف السجل السلوكي للمريض "${deleteConfirmTarget.name}" بنجاح.`, `Behavioral log for "${deleteConfirmTarget.name}" removed successfully.`), 'success');
                         }
                         setDeleteConfirmTarget(null);
                       }}
                       className="px-5 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-xl font-bold shadow-lg shadow-rose-900/40 cursor-pointer"
                     >
-                      حذف نهائي ومؤكد 🗑️
+                      {text('حذف نهائي ومؤكد 🗑️', 'Confirm Delete 🗑️')}
                     </button>
                   </div>
                 </div>
@@ -6271,7 +6595,7 @@ export default function App() {
                       className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Copy className="w-4 h-4 text-teal-400" />
-                      <span>نسخ التقرير إلى الحافظة 📋</span>
+                      <span>{text('نسخ التقرير إلى الحافظة 📋', 'Copy Report to Clipboard 📋')}</span>
                     </button>
                     <button 
                       onClick={() => {
@@ -6303,7 +6627,7 @@ export default function App() {
                       className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <FileText className="w-4 h-4 text-teal-400" />
-                      <span>تنزيل كملف نصي (.txt) 📥</span>
+                      <span>{text('تنزيل كملف نصي (.txt) 📥', 'Download Text File (.txt) 📥')}</span>
                     </button>
                     <button 
                       onClick={() => {
@@ -6316,7 +6640,7 @@ export default function App() {
                       className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <Printer className="w-4 h-4" />
-                      <span>أمر طباعة النظام المباشر 🖨️</span>
+                      <span>{text('أمر طباعة النظام المباشر 🖨️', 'Direct Print Command 🖨️')}</span>
                     </button>
                   </div>
 
@@ -6380,7 +6704,7 @@ export default function App() {
                       onClick={() => setShowPrintPreviewModal(false)} 
                       className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-xs cursor-pointer"
                     >
-                      إغلاق المعاينة
+                      {text('إغلاق المعاينة', 'Close Preview')}
                     </button>
                   </div>
                 </div>
@@ -6391,34 +6715,34 @@ export default function App() {
 
             {/* ----------------- MODAL: ADD BEHAVIOR LOG ----------------- */}
             {showAddBehaviorModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-slate-100" dir="rtl">
-                <div className="w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 text-slate-100" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                <div className={`w-full max-w-lg rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto ${lang === 'ar' ? 'text-right' : 'text-left'}`}>
                   <button 
                     type="button"
                     onClick={() => setShowAddBehaviorModal(false)}
-                    className="absolute top-4 left-4 p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 cursor-pointer"
+                    className={`absolute top-4 ${lang === 'ar' ? 'left-4' : 'right-4'} p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 cursor-pointer`}
                   >
                     <X className="w-4 h-4" />
                   </button>
                   
                   <h3 className="text-lg font-bold text-teal-400 mb-4 flex items-center gap-2">
-                    <span>🧠 {selectedBehaviorLogId ? 'تعديل ملاحظة سلوكية وأعراض جانبية قائمة' : 'تسجيل ملاحظة سلوكية وأعراض جانبية جديدة'}</span>
+                    <span>🧠 {selectedBehaviorLogId ? text('تعديل ملاحظة سلوكية وأعراض جانبية قائمة', 'Edit Behavioral Note & Adverse Effects') : text('تسجيل ملاحظة سلوكية وأعراض جانبية جديدة', 'Record New Behavioral Note & Side Effects')}</span>
                   </h3>
 
                   <form onSubmit={handleAddBehaviorLog} className="space-y-4 text-xs text-slate-300">
                     
                     {/* Resident Select */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-bold">المقيم المستهدف *</label>
+                      <label className="block text-slate-400 mb-1 font-bold">{text('المقيم المستهدف *', 'Target Resident *')}</label>
                       <select 
                         required
                         value={behaviorForm.residentId}
                         onChange={(e) => setBehaviorForm(prev => ({ ...prev, residentId: e.target.value }))}
                         className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
                       >
-                        <option value="">-- اختر المقيم المستهدف من القائمة --</option>
+                        <option value="">{text('-- اختر المقيم المستهدف من القائمة --', '-- Select Target Resident from list --')}</option>
                         {residents.map(r => (
-                          <option key={r.id} value={r.id}>{r.name} ({r.roomNumber})</option>
+                          <option key={r.id} value={r.id}>{r.name} ({text('غرفة', 'Room')} {r.roomNumber})</option>
                         ))}
                       </select>
                     </div>
@@ -6426,30 +6750,30 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {/* Behavior Rating Select */}
                       <div>
-                        <label className="block text-slate-400 mb-1 font-bold">التقييم والتقلب السلوكي *</label>
+                        <label className="block text-slate-400 mb-1 font-bold">{text('التقييم والتقلب السلوكي *', 'Behavioral Rating & Status *')}</label>
                         <select 
                           required
                           value={behaviorForm.behaviorRating}
                           onChange={(e) => setBehaviorForm(prev => ({ ...prev, behaviorRating: e.target.value }))}
                           className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
                         >
-                          <option value="stable">مستقر وضمن الحدود الطبيعية 🟢</option>
-                          <option value="agitated">هياج سلوكي حاد 🔴</option>
-                          <option value="anxious">قلق وتوتر نفسى 🟡</option>
-                          <option value="withdrawn">انسحاب وعزلة اجتماعية 🟣</option>
-                          <option value="hyperactive">نشاط وحركة مفرطة 🔵</option>
+                          <option value="stable">{text('مستقر وضمن الحدود الطبيعية 🟢', 'Stable & within normal limits 🟢')}</option>
+                          <option value="agitated">{text('هياج سلوكي حاد 🔴', 'Acute Agitation / Distress 🔴')}</option>
+                          <option value="anxious">{text('قلق وتوتر نفسي 🟡', 'Anxiety & Tension 🟡')}</option>
+                          <option value="withdrawn">{text('انسحاب وعزلة اجتماعية 🟣', 'Social Withdrawal / Isolation 🟣')}</option>
+                          <option value="hyperactive">{text('نشاط وحركة مفرطة 🔵', 'Hyperactivity & Restlessness 🔵')}</option>
                         </select>
                       </div>
 
                       {/* Suspected Medicine Select */}
                       <div>
-                        <label className="block text-slate-400 mb-1 font-bold">الدواء المرتبط (المشتبه به) - اختياري</label>
+                        <label className="block text-slate-400 mb-1 font-bold">{text('الدواء المرتبط (المشتبه به) - اختياري', 'Suspected / Linked Medication - Optional')}</label>
                         <select 
                           value={behaviorForm.recentMedicineId}
                           onChange={(e) => setBehaviorForm(prev => ({ ...prev, recentMedicineId: e.target.value }))}
                           className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
                         >
-                          <option value="">-- لا يوجد دواء مرتبط مباشر --</option>
+                          <option value="">{text('-- لا يوجد دواء مرتبط مباشر --', '-- No direct medication linked --')}</option>
                           {medicines.map(m => (
                             <option key={m.id} value={m.id}>{m.commercialName} ({m.scientificName})</option>
                           ))}
@@ -6460,7 +6784,7 @@ export default function App() {
                     {/* Side effects checklist with custom additions/edits/deletions */}
                     <div>
                       <div className="flex justify-between items-center mb-1.5">
-                        <label className="block text-slate-400 font-bold">الأعراض الجانبية المرصودة (اختر كل ما ينطبق)</label>
+                        <label className="block text-slate-400 font-bold">{text('الأعراض الجانبية المرصودة (اختر كل ما ينطبق)', 'Observed Side Effects (Select all that apply)')}</label>
                         <button
                           type="button"
                           onClick={() => {
@@ -6469,7 +6793,7 @@ export default function App() {
                           }}
                           className="text-[11px] text-teal-400 hover:underline cursor-pointer font-bold"
                         >
-                          {showAddSideEffectInput ? "إلغاء ❌" : "+ إضافة عرض جديد"}
+                          {showAddSideEffectInput ? text("إلغاء ❌", "Cancel ❌") : text("+ إضافة عرض جديد", "+ Add New Side Effect")}
                         </button>
                       </div>
 
@@ -6479,8 +6803,8 @@ export default function App() {
                             type="text"
                             value={newSideEffectInput}
                             onChange={(e) => setNewSideEffectInput(e.target.value)}
-                            placeholder="العرض الجانبي الجديد (مثال: طفح جلدي وحساسية)"
-                            className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-850 text-white focus:border-teal-500 outline-none"
+                            placeholder={text("العرض الجانبي الجديد (مثال: طفح جلدي، دوخة...)", "New side effect (e.g., skin rash, dizziness...)")}
+                            className="flex-1 px-3 py-1.5 text-xs rounded-lg bg-slate-950 border border-slate-855 text-white focus:border-teal-500 outline-none"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') {
                                 e.preventDefault();
@@ -6500,12 +6824,12 @@ export default function App() {
                                 setNewSideEffectInput('');
                                 setShowAddSideEffectInput(false);
                               } else {
-                                showToast('الرجاء كتابة اسم العرض أولاً', 'error');
+                                showToast(text('الرجاء كتابة اسم العرض أولاً', 'Please enter a side effect name'), 'error');
                               }
                             }}
                             className="px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-bold cursor-pointer shrink-0 transition"
                           >
-                            حفظ 💾
+                            {text('حفظ 💾', 'Save 💾')}
                           </button>
                         </div>
                       )}
@@ -6513,6 +6837,17 @@ export default function App() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-xl border border-slate-850 max-h-56 overflow-y-auto">
                         {customSideEffects.map((item) => {
                           const isChecked = behaviorForm.sideEffects.includes(item.key);
+                          const defaultSideEffectTranslations: Record<string, { ar: string, en: string }> = {
+                            drowsiness: { ar: 'خمول ونعاس حاد 😴', en: 'Drowsiness & Sedation 😴' },
+                            appetite_loss: { ar: 'فقدان شهية واهتمام 🍽️', en: 'Appetite Loss & Anorexia 🍽️' },
+                            tremors: { ar: 'ارتعاش ورجفة بالأطراف 🫨', en: 'Tremors & Shaking 🫨' },
+                            rash: { ar: 'طفح جلدي وحساسية 🔴', en: 'Skin Rash & Allergic Reaction 🔴' },
+                            nausea: { ar: 'غثيان واضطراب معدة 🤢', en: 'Nausea & Stomach Upset 🤢' },
+                            insomnia: { ar: 'أرق وصعوبة نوم حادة ⏰', en: 'Severe Insomnia & Sleeplessness ⏰' }
+                          };
+                          const displayItemLabel = defaultSideEffectTranslations[item.key]
+                            ? (lang === 'ar' ? defaultSideEffectTranslations[item.key].ar : defaultSideEffectTranslations[item.key].en)
+                            : item.label;
 
                           return (
                             <div key={item.key} className="flex items-center justify-between gap-2 p-1.5 rounded-lg hover:bg-slate-900/60 transition group min-h-[36px]">
@@ -6542,12 +6877,12 @@ export default function App() {
                                         setEditingSideEffectKey(null);
                                         setEditingSideEffectLabel('');
                                       } else {
-                                        showToast('الرجاء كتابة العرض المعدل', 'error');
+                                        showToast(text('الرجاء كتابة العرض المعدل', 'Please enter edited side effect name'), 'error');
                                       }
                                     }}
                                     className="px-2 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded text-[10px] font-bold cursor-pointer shrink-0 transition"
                                   >
-                                    حفظ
+                                    {text('حفظ', 'Save')}
                                   </button>
                                   <button
                                     type="button"
@@ -6557,12 +6892,12 @@ export default function App() {
                                     }}
                                     className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] font-bold cursor-pointer shrink-0 transition"
                                   >
-                                    إلغاء
+                                    {text('إلغاء', 'Cancel')}
                                   </button>
                                 </div>
                               ) : deletingSideEffectKey === item.key ? (
                                 <div className="flex items-center justify-between gap-1.5 w-full">
-                                  <span className="text-[10px] text-rose-400 font-bold truncate">تأكيد حذف: {item.label}؟</span>
+                                  <span className="text-[10px] text-rose-400 font-bold truncate">{text(`تأكيد حذف: ${displayItemLabel}؟`, `Delete: ${displayItemLabel}?`)}</span>
                                   <div className="flex gap-1 shrink-0">
                                     <button
                                       type="button"
@@ -6578,14 +6913,14 @@ export default function App() {
                                       }}
                                       className="px-2 py-0.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-[9px] font-bold cursor-pointer transition animate-pulse"
                                     >
-                                      نعم ✅
+                                      {text('نعم ✅', 'Yes ✅')}
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => setDeletingSideEffectKey(null)}
                                       className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[9px] font-bold cursor-pointer transition"
                                     >
-                                      لا ❌
+                                      {text('لا ❌', 'No ❌')}
                                     </button>
                                   </div>
                                 </div>
@@ -6606,7 +6941,7 @@ export default function App() {
                                       }}
                                       className="w-4 h-4 rounded border-slate-800 text-teal-600 focus:ring-teal-500 bg-slate-950 cursor-pointer"
                                     />
-                                    <span className="truncate text-[11px] font-medium">{item.label}</span>
+                                    <span className="truncate text-[11px] font-medium">{displayItemLabel}</span>
                                   </label>
 
                                   <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition shrink-0">
@@ -6617,7 +6952,7 @@ export default function App() {
                                         setEditingSideEffectLabel(item.label);
                                       }}
                                       className="p-1 hover:bg-slate-800 text-teal-400 rounded transition cursor-pointer"
-                                      title="تعديل هذا العرض"
+                                      title={text("تعديل هذا العرض", "Edit this side effect")}
                                     >
                                       <Edit2 className="w-3 h-3" />
                                     </button>
@@ -6627,7 +6962,7 @@ export default function App() {
                                         setDeletingSideEffectKey(item.key);
                                       }}
                                       className="p-1 hover:bg-slate-800 text-rose-400 rounded transition cursor-pointer"
-                                      title="حذف هذا العرض"
+                                      title={text("حذف هذا العرض", "Delete this side effect")}
                                     >
                                       <Trash2 className="w-3 h-3" />
                                     </button>
@@ -6642,29 +6977,29 @@ export default function App() {
 
                     {/* Severity Level select */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-bold">درجة خطورة وحدة الأعراض</label>
+                      <label className="block text-slate-400 mb-1 font-bold">{text('درجة خطورة وحدة الأعراض', 'Side Effect Severity Level')}</label>
                       <select 
                         value={behaviorForm.severity}
                         onChange={(e) => setBehaviorForm(prev => ({ ...prev, severity: e.target.value as any }))}
                         className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none cursor-pointer"
                       >
-                        <option value="none">بدون عوارض (سليم) ✅</option>
-                        <option value="mild">طفيفة وغير مقلقة 🟢</option>
-                        <option value="moderate">متوسطة الأثر وتتطلب متبعة 🟡</option>
-                        <option value="severe">حادة للغاية وتتطلب تدخل طبيب عاجل 🚨</option>
+                        <option value="none">{text('بدون عوارض (سليم) ✅', 'None / Normal ✅')}</option>
+                        <option value="mild">{text('طفيفة وغير مقلقة 🟢', 'Mild / Not concerning 🟢')}</option>
+                        <option value="moderate">{text('متوسطة الأثر وتتطلب متابعة 🟡', 'Moderate / Requires monitoring 🟡')}</option>
+                        <option value="severe">{text('حادة للغاية وتتطلب تدخل طبيب عاجل 🚨', 'Severe / Urgent medical intervention required 🚨')}</option>
                       </select>
                     </div>
 
                     {/* Clinical Notes text area */}
                     <div>
-                      <label className="block text-slate-400 mb-1 font-bold">تقرير الملاحظة والتفاصيل السلوكية *</label>
+                      <label className="block text-slate-400 mb-1 font-bold">{text('تقرير الملاحظة والتفاصيل السلوكية *', 'Clinical Observation Report & Behavioral Details *')}</label>
                       <textarea 
                         required
                         rows={3}
                         value={behaviorForm.notes}
                         onChange={(e) => setBehaviorForm(prev => ({ ...prev, notes: e.target.value }))}
                         className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none font-sans"
-                        placeholder="اكتب بالتفصيل التقلبات الملاحظة، مثلاً: تغير في سلوك المقيم بعد تناول دواء الصرع، هدوء مفرط، صعوبة تركيز، تفاصيل الغثيان أو الحساسية..."
+                        placeholder={text("اكتب بالتفصيل التقلبات الملاحظة، مثلاً: تغير في سلوك المقيم بعد تناول دواء الصرع، هدوء مفرط، صعوبة تركيز، تفاصيل الغثيان أو الحساسية...", "Describe observed behavioral changes in detail, e.g., resident behavior changes after dose, lethargy, poor focus, tremors, nausea...")}
                       />
                     </div>
 
@@ -6672,7 +7007,7 @@ export default function App() {
                       type="submit"
                       className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-teal-900/25 cursor-pointer"
                     >
-                      حفظ وتوثيق الملاحظة الطبية والسلوكية 💾
+                      {text('حفظ وتوثيق الملاحظة الطبية والسلوكية 💾', 'Save Behavioral & Clinical Observation 💾')}
                     </button>
                   </form>
                 </div>
@@ -6688,23 +7023,23 @@ export default function App() {
                 <div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
                   <h3 className="text-lg font-bold text-rose-400 flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5" />
-                    تأكيد حذف الدواء نهائياً
+                    {text('تأكيد حذف الدواء نهائياً', 'Confirm Medication Deletion')}
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    هل أنت متأكد من رغبتك في شطب هذا الدواء نهائياً من مخزون صيدلية الرعاية؟ لا يمكن التراجع عن هذا الإجراء وسيتم إلغاء تتبع الكميات المسجلة.
+                    {text('هل أنت متأكد من رغبتك في شطب هذا الدواء نهائياً من مخزون صيدلية الرعاية؟ لا يمكن التراجع عن هذا الإجراء وسيتم إلغاء تتبع الكميات المسجلة.', 'Are you sure you want to permanently delete this medicine from pharmacy stock? This action cannot be undone.')}
                   </p>
                   <div className="flex gap-3 justify-end pt-2">
                     <button
                       onClick={() => setDeleteConfirmId(null)}
                       className="px-4 py-2 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl"
                     >
-                      إلغاء الأمر
+                      {text('إلغاء الأمر', 'Cancel')}
                     </button>
                     <button
                       onClick={handleDeleteMedicine}
                       className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl"
                     >
-                      تأكيد الحذف والشطب
+                      {text('تأكيد الحذف والشطب', 'Confirm Delete')}
                     </button>
                   </div>
                 </div>
@@ -6717,17 +7052,17 @@ export default function App() {
                 <div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-6 shadow-2xl space-y-4">
                   <h3 className="text-lg font-bold text-rose-400 flex items-center gap-2">
                     <AlertTriangle className="w-5 h-5" />
-                    تأكيد حذف شركة الأدوية
+                    {text('تأكيد حذف شركة الأدوية', 'Confirm Pharma Company Deletion')}
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    هل أنت متأكد تماماً من شطب شركة الأدوية <strong className="text-teal-400">{companies.find(c => c.id === deleteConfirmCompanyId)?.name}</strong> نهائياً من دليل شركات التوريد والإنتاج؟
+                    {text(`هل أنت متأكد تماماً من شطب شركة الأدوية "${companies.find(c => c.id === deleteConfirmCompanyId)?.name}" نهائياً من دليل الشركات؟`, `Are you sure you want to permanently delete company "${companies.find(c => c.id === deleteConfirmCompanyId)?.name}"?`)}
                   </p>
                   <div className="flex gap-3 justify-end pt-2">
                     <button
                       onClick={() => setDeleteConfirmCompanyId(null)}
                       className="px-4 py-2 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
                     >
-                      إلغاء الأمر
+                      {text('إلغاء الأمر', 'Cancel')}
                     </button>
                     <button
                       onClick={() => {
@@ -6736,13 +7071,13 @@ export default function App() {
                           const updated = companies.filter(c => c.id !== deleteConfirmCompanyId);
                           setCompanies(updated);
                           localStorage.setItem('care_pharmacy_companies', JSON.stringify(updated));
-                          showToast(`تم حذف شركة "${targetCompany.name}" بنجاح.`, 'success');
+                          showToast(text(`تم حذف شركة "${targetCompany.name}" بنجاح.`, `Company "${targetCompany.name}" deleted successfully.`), 'success');
                         }
                         setDeleteConfirmCompanyId(null);
                       }}
                       className="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl cursor-pointer"
                     >
-                      تأكيد الحذف والشطب
+                      {text('تأكيد الحذف والشطب', 'Confirm Delete')}
                     </button>
                   </div>
                 </div>
@@ -6762,7 +7097,7 @@ export default function App() {
                   
                   <h3 className="text-lg font-bold text-teal-400 mb-4 flex items-center gap-2">
                     <Plus className="w-5 h-5" />
-                    إضافة صنف دواء جديد لمستودع الصيدلية
+                    {text('إضافة صنف دواء جديد لمستودع الصيدلية', 'Add New Medication to Pharmacy Inventory')}
                   </h3>
 
                   <form onSubmit={handleAddMedicine} className="space-y-4 text-xs text-slate-300">
@@ -6813,7 +7148,7 @@ export default function App() {
                             onClick={() => setShowUnitInput(!showUnitInput)}
                             className="text-[10px] text-teal-400 hover:underline cursor-pointer"
                           >
-                            {showUnitInput ? "إلغاء" : "+ إضافة وحدة"}
+                            {showUnitInput ? text("إلغاء", "Cancel") : text("+ إضافة وحدة", "+ Add Unit")}
                           </button>
                         </div>
                         {showUnitInput ? (
@@ -6822,7 +7157,7 @@ export default function App() {
                               type="text"
                               value={newUnitInput}
                               onChange={(e) => setNewUnitInput(e.target.value)}
-                              placeholder="الوحدة (مثل: قارورة)"
+                              placeholder={text("الوحدة (مثل: قارورة)", "Unit (e.g., Vial)")}
                               className="flex-1 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-[11px]"
                             />
                             <button
@@ -6830,7 +7165,7 @@ export default function App() {
                               onClick={handleAddCustomUnit}
                               className="px-2.5 bg-teal-600 hover:bg-teal-500 rounded-xl text-white font-bold cursor-pointer text-[10px]"
                             >
-                              حفظ
+                              {text('حفظ', 'Save')}
                             </button>
                           </div>
                         ) : (
@@ -6847,7 +7182,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block text-slate-400 mb-1">سعر الوحدة (ر.س) *</label>
+                        <label className="block text-slate-400 mb-1">{text('سعر الوحدة (ر.س) *', 'Unit Price (SAR) *')}</label>
                         <input 
                           type="number"
                           required
@@ -6862,7 +7197,7 @@ export default function App() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-slate-400 mb-1">تاريخ انتهاء الصلاحية *</label>
+                        <label className="block text-slate-400 mb-1">{text('تاريخ انتهاء الصلاحية *', 'Expiry Date *')}</label>
                         <input 
                           type="date"
                           required
@@ -6874,13 +7209,13 @@ export default function App() {
 
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <label className="block text-slate-400">الفئة العلاجية *</label>
+                          <label className="block text-slate-400">{text('الفئة العلاجية *', 'Therapeutic Category *')}</label>
                           <button
                             type="button"
                             onClick={() => setShowCategoryInput(!showCategoryInput)}
                             className="text-[10px] text-teal-400 hover:underline cursor-pointer"
                           >
-                            {showCategoryInput ? "إلغاء" : "+ إضافة فئة"}
+                            {showCategoryInput ? text("إلغاء", "Cancel") : text("+ إضافة فئة", "+ Add Category")}
                           </button>
                         </div>
                         {showCategoryInput ? (
@@ -6889,7 +7224,7 @@ export default function App() {
                               type="text"
                               value={newCategoryInput}
                               onChange={(e) => setNewCategoryInput(e.target.value)}
-                              placeholder="الفئة (مثل: فيتامينات)"
+                              placeholder={text("الفئة (مثل: فيتامينات)", "Category (e.g., Vitamins)")}
                               className="flex-1 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-[11px]"
                             />
                             <button
@@ -6897,7 +7232,7 @@ export default function App() {
                               onClick={handleAddCustomCategory}
                               className="px-2.5 bg-teal-600 hover:bg-teal-500 rounded-xl text-white font-bold cursor-pointer text-[10px]"
                             >
-                              حفظ
+                              {text('حفظ', 'Save')}
                             </button>
                           </div>
                         ) : (
@@ -6916,14 +7251,14 @@ export default function App() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-slate-400 mb-1">الشركة المصنعة للدواء</label>
+                        <label className="block text-slate-400 mb-1">{text('الشركة المصنعة للدواء', 'Manufacturer')}</label>
                         <input 
                           type="text"
                           list="company-list"
                           value={medForm.manufacturer}
                           onChange={(e) => setMedForm(prev => ({ ...prev, manufacturer: e.target.value }))}
                           className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
-                          placeholder="اكتب اسم الشركة أو اختر من القائمة..."
+                          placeholder={text("اكتب اسم الشركة أو اختر من القائمة...", "Type company name or choose from list...")}
                         />
                         <datalist id="company-list">
                           {companies.map(c => (
@@ -6933,7 +7268,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block text-slate-400 mb-1">البدائل المتاحة لهذا الدواء</label>
+                        <label className="block text-slate-400 mb-1">{text('البدائل المتاحة لهذا الدواء', 'Available Alternatives')}</label>
                         <div className="flex gap-2">
                           <input 
                             type="text"
@@ -6953,7 +7288,7 @@ export default function App() {
                               }
                             }}
                             className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-right text-xs"
-                            placeholder="اكتب اسم البديل ثم اضغط Enter أو زر الإضافة..."
+                            placeholder={text("اكتب اسم البديل ثم اضغط Enter أو زر الإضافة...", "Type alternative and press Enter...")}
                           />
                           <button
                             type="button"
@@ -6969,7 +7304,7 @@ export default function App() {
                             }}
                             className="px-3 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
                           >
-                            إضافة بديل +
+                            {text('إضافة بديل +', 'Add Alternative +')}
                           </button>
                         </div>
                         {/* Display badges */}
@@ -6990,7 +7325,7 @@ export default function App() {
                             </span>
                           ))}
                           {getAlternativesArray(medForm.alternatives).length === 0 && (
-                            <span className="text-[10px] text-slate-500">لم يتم تسجيل أي بدائل لهذا الدواء بعد.</span>
+                            <span className="text-[10px] text-slate-500">{text('لم يتم تسجيل أي بدائل لهذا الدواء بعد.', 'No alternatives added yet.')}</span>
                           )}
                         </div>
                       </div>
@@ -7000,7 +7335,7 @@ export default function App() {
                       type="submit"
                       className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-teal-900/20"
                     >
-                      إضافة الدواء للمستودع وتوليد سجل المراقبة
+                      {text('إضافة الدواء للمستودع وتوليد سجل المراقبة', 'Add Medicine & Generate Trail')}
                     </button>
                   </form>
                 </div>
@@ -7020,7 +7355,7 @@ export default function App() {
                   
                   <h3 className="text-lg font-bold text-teal-400 mb-4 flex items-center gap-2">
                     <Edit2 className="w-5 h-5" />
-                    تعديل صنف دواء في مستودع الصيدلية
+                    {text('تعديل صنف دواء في مستودع الصيدلية', 'Edit Medication in Pharmacy Inventory')}
                   </h3>
 
                   <form onSubmit={handleEditMedicine} className="space-y-4 text-xs text-slate-300">
@@ -7069,7 +7404,7 @@ export default function App() {
                             onClick={() => setShowUnitInput(!showUnitInput)}
                             className="text-[10px] text-teal-400 hover:underline cursor-pointer"
                           >
-                            {showUnitInput ? "إلغاء" : "+ إضافة وحدة"}
+                            {showUnitInput ? text("إلغاء", "Cancel") : text("+ إضافة وحدة", "+ Add Unit")}
                           </button>
                         </div>
                         {showUnitInput ? (
@@ -7078,7 +7413,7 @@ export default function App() {
                               type="text"
                               value={newUnitInput}
                               onChange={(e) => setNewUnitInput(e.target.value)}
-                              placeholder="الوحدة (مثل: قارورة)"
+                              placeholder={text("الوحدة (مثل: قارورة)", "Unit (e.g., Vial)")}
                               className="flex-1 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-[11px]"
                             />
                             <button
@@ -7086,7 +7421,7 @@ export default function App() {
                               onClick={handleAddCustomUnit}
                               className="px-2.5 bg-teal-600 hover:bg-teal-500 rounded-xl text-white font-bold cursor-pointer text-[10px]"
                             >
-                              حفظ
+                              {text('حفظ', 'Save')}
                             </button>
                           </div>
                         ) : (
@@ -7103,7 +7438,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block text-slate-400 mb-1">سعر الوحدة (ر.س) *</label>
+                        <label className="block text-slate-400 mb-1">{text('سعر الوحدة (ر.س) *', 'Unit Price (SAR) *')}</label>
                         <input 
                           type="number"
                           required
@@ -7118,7 +7453,7 @@ export default function App() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-slate-400 mb-1">تاريخ انتهاء الصلاحية *</label>
+                        <label className="block text-slate-400 mb-1">{text('تاريخ انتهاء الصلاحية *', 'Expiry Date *')}</label>
                         <input 
                           type="date"
                           required
@@ -7130,13 +7465,13 @@ export default function App() {
 
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <label className="block text-slate-400">الفئة العلاجية *</label>
+                          <label className="block text-slate-400">{text('الفئة العلاجية *', 'Therapeutic Category *')}</label>
                           <button
                             type="button"
                             onClick={() => setShowCategoryInput(!showCategoryInput)}
                             className="text-[10px] text-teal-400 hover:underline cursor-pointer"
                           >
-                            {showCategoryInput ? "إلغاء" : "+ إضافة فئة"}
+                            {showCategoryInput ? text("إلغاء", "Cancel") : text("+ إضافة فئة", "+ Add Category")}
                           </button>
                         </div>
                         {showCategoryInput ? (
@@ -7145,7 +7480,7 @@ export default function App() {
                               type="text"
                               value={newCategoryInput}
                               onChange={(e) => setNewCategoryInput(e.target.value)}
-                              placeholder="الفئة (مثل: فيتامينات)"
+                              placeholder={text("الفئة (مثل: فيتامينات)", "Category (e.g., Vitamins)")}
                               className="flex-1 px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-[11px]"
                             />
                             <button
@@ -7153,7 +7488,7 @@ export default function App() {
                               onClick={handleAddCustomCategory}
                               className="px-2.5 bg-teal-600 hover:bg-teal-500 rounded-xl text-white font-bold cursor-pointer text-[10px]"
                             >
-                              حفظ
+                              {text('حفظ', 'Save')}
                             </button>
                           </div>
                         ) : (
@@ -7172,14 +7507,14 @@ export default function App() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-slate-400 mb-1">الشركة المصنعة للدواء</label>
+                        <label className="block text-slate-400 mb-1">{text('الشركة المصنعة للدواء', 'Manufacturer')}</label>
                         <input 
                           type="text"
                           list="company-list"
                           value={medForm.manufacturer}
                           onChange={(e) => setMedForm(prev => ({ ...prev, manufacturer: e.target.value }))}
                           className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none"
-                          placeholder="اكتب اسم الشركة أو اختر من القائمة..."
+                          placeholder={text("اكتب اسم الشركة أو اختر من القائمة...", "Type company name or choose from list...")}
                         />
                         <datalist id="company-list">
                           {companies.map(c => (
@@ -7189,7 +7524,7 @@ export default function App() {
                       </div>
 
                       <div>
-                        <label className="block text-slate-400 mb-1">البدائل المتاحة لهذا الدواء</label>
+                        <label className="block text-slate-400 mb-1">{text('البدائل المتاحة لهذا الدواء', 'Available Alternatives')}</label>
                         <div className="flex gap-2">
                           <input 
                             type="text"
@@ -7209,7 +7544,7 @@ export default function App() {
                               }
                             }}
                             className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white focus:border-teal-500 outline-none text-right text-xs"
-                            placeholder="اكتب اسم البديل ثم اضغط Enter أو زر الإضافة..."
+                            placeholder={text("اكتب اسم البديل ثم اضغط Enter أو زر الإضافة...", "Type alternative and press Enter...")}
                           />
                           <button
                             type="button"
@@ -7225,7 +7560,7 @@ export default function App() {
                             }}
                             className="px-3 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
                           >
-                            إضافة بديل +
+                            {text('إضافة بديل +', 'Add Alternative +')}
                           </button>
                         </div>
                         {/* Display badges */}
@@ -7246,7 +7581,7 @@ export default function App() {
                             </span>
                           ))}
                           {getAlternativesArray(medForm.alternatives).length === 0 && (
-                            <span className="text-[10px] text-slate-500">لم يتم تسجيل أي بدائل لهذا الدواء بعد.</span>
+                            <span className="text-[10px] text-slate-500">{text('لم يتم تسجيل أي بدائل لهذا الدواء بعد.', 'No alternatives added yet.')}</span>
                           )}
                         </div>
                       </div>
@@ -7256,7 +7591,7 @@ export default function App() {
                       type="submit"
                       className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4"
                     >
-                      حفظ التعديلات الطارئة
+                      {text('حفظ التعديلات الطارئة', 'Save Changes')}
                     </button>
                   </form>
                 </div>
@@ -7357,7 +7692,7 @@ export default function App() {
                       type="submit"
                       className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-indigo-900/20"
                     >
-                      إتمام وتوثيق عملية الصرف الطبي
+                      {text('إتمام وتوثيق عملية الصرف الطبي', 'Complete & Document Dispensing')}
                     </button>
                   </form>
                 </div>
@@ -7380,7 +7715,7 @@ export default function App() {
                   
                   <h3 className="text-lg font-bold text-teal-400 mb-4 flex items-center gap-2">
                     <Plus className="w-5 h-5" />
-                    <span>{selectedCompanyId ? 'تعديل بيانات شركة الأدوية' : 'إضافة شركة أدوية جديدة'}</span>
+                    <span>{selectedCompanyId ? text('تعديل بيانات شركة الأدوية', 'Edit Pharma Company') : text('إضافة شركة أدوية جديدة', 'Add New Pharma Company')}</span>
                   </h3>
 
                   <form onSubmit={handleAddOrEditCompany} className="space-y-4 text-xs text-slate-300">
@@ -7458,7 +7793,7 @@ export default function App() {
                       type="submit"
                       className="w-full rounded-xl bg-teal-600 hover:bg-teal-700 py-2.5 text-sm font-bold text-white transition mt-4 shadow-lg shadow-teal-900/20 cursor-pointer"
                     >
-                      {selectedCompanyId ? 'تحديث بيانات الشركة' : 'إضافة الشركة الجديدة وحفظها'}
+                      {selectedCompanyId ? text('تحديث بيانات الشركة', 'Update Company Details') : text('إضافة الشركة الجديدة وحفظها', 'Save & Add New Company')}
                     </button>
                   </form>
                 </div>
