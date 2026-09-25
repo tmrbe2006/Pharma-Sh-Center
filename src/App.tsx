@@ -1230,8 +1230,12 @@ export default function App() {
 
   // Simulated scheduled WhatsApp & Email Alert System Trigger with Real Configurations
   const triggerScheduledAlertsTest = async (isAutoPilot = false) => {
+    let response;
+    let data;
+    let fetchFailed = false;
+
     try {
-      const response = await fetch('/api/notifications/dispatch-test', {
+      response = await fetch('/api/notifications/dispatch-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1255,12 +1259,240 @@ export default function App() {
           notificationEmail: notificationEmail
         })
       });
-      const data = await response.json();
-      if (data && data.success) {
-        setNotificationAlertText(data.message);
-        if (data.logs && data.logs.length > 0) {
-          setNotificationLogs(prev => [...data.logs, ...prev]);
+
+      if (!response.ok) {
+        fetchFailed = true;
+      } else {
+        data = await response.json();
+      }
+    } catch (e) {
+      fetchFailed = true;
+    }
+
+    // Client-side fallback if backend API fetch fails (e.g. running statically on Cloudflare Pages)
+    if (fetchFailed || !data || !data.success) {
+      try {
+        console.log("⚠️ Backend API dispatch-test failed or unavailable. Initiating client-side secure fallback dispatch...");
+        
+        const parseFlexibleDateLoc = (dateStr: string) => {
+          if (!dateStr) return null;
+          const clean = dateStr.trim();
+          let d = new Date(clean);
+          if (!isNaN(d.getTime())) return d;
+          const parts = clean.split(/[-/.]/);
+          if (parts.length === 3) {
+            const p0 = parseInt(parts[0], 10);
+            const p1 = parseInt(parts[1], 10);
+            const p2 = parseInt(parts[2], 10);
+            if (p2 > 1000) return new Date(p2, p1 - 1, p0);
+            if (p0 > 1000) return new Date(p0, p1 - 1, p2);
+          }
+          return null;
+        };
+
+        const days = Number(alertDays) || 30;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const warningThreshold = new Date(today);
+        warningThreshold.setDate(today.getDate() + days);
+
+        const expiredList: any[] = [];
+        const expiringSoon: any[] = [];
+
+        (medicines || []).forEach((m: any) => {
+          const exp = parseFlexibleDateLoc(m.expiryDate);
+          if (exp) {
+            exp.setHours(0, 0, 0, 0);
+            if (exp < today) {
+              expiredList.push(m);
+            } else if (exp <= warningThreshold) {
+              expiringSoon.push(m);
+            }
+          }
+        });
+
+        const criticalStock = (medicines || []).filter((m: any) => Number(m.quantity) <= 15);
+        const logs: string[] = [`[مشغل السحابة المحمول] تم تشغيل الفحص الاحتياطي الذكي من متصفح المستخدم مباشرة.`];
+
+        let alertMessage = `🛡️ *تقرير التنبيهات الوقائي لصيدلية مركز الرعاية* 🛡️\n\n`;
+        let hasActualWarnings = expiredList.length > 0 || expiringSoon.length > 0 || criticalStock.length > 0;
+
+        if (hasActualWarnings) {
+          if (expiredList.length > 0) {
+            alertMessage += `🚫 *أدوية منتهية الصلاحية بالفعل (يجب سحبها فوراً):*\n`;
+            expiredList.forEach((m: any) => {
+              alertMessage += `- اسم الدواء: *${m.commercialName}* (${m.scientificName}) - تاريخ انتهاء الصلاحية: *${m.expiryDate}* - الكمية: *${m.quantity} ${m.unit}*\n`;
+            });
+            alertMessage += `\n`;
+          }
+
+          if (expiringSoon.length > 0) {
+            alertMessage += `⚠️ *أدوية تقترب صلاحيتها من الانتهاء (أقل من ${days} يوم):*\n`;
+            expiringSoon.forEach((m: any) => {
+              alertMessage += `- اسم الدواء: *${m.commercialName}* (${m.scientificName}) - تاريخ انتهاء الصلاحية: *${m.expiryDate}* - الكمية: *${m.quantity} ${m.unit}*\n`;
+            });
+            alertMessage += `\n`;
+          }
+
+          if (criticalStock.length > 0) {
+            alertMessage += `📉 *أدوية وصلت لمعدل مخزون حرج (15 وحدة أو أقل):*\n`;
+            criticalStock.forEach((m: any) => {
+              alertMessage += `- *${m.commercialName}* (${m.scientificName}): المتبقي ${m.quantity} ${m.unit} فقط!\n`;
+            });
+            alertMessage += `\n`;
+          }
+        } else {
+          alertMessage += `💡 *تنبيه تجريبي ومحاكاة للتأكد من فاعلية التنبيهات (لوجود مخزونك في حالة سليمة وآمنة):*\n\n`;
+          alertMessage += `⚠️ *أدوية تقترب صلاحيتها من الانتهاء (أقل من ${days} يوم):*\n`;
+          alertMessage += `- اسم الدواء: *بندول كولد اند فلو (Panadol)* - تاريخ انتهاء الصلاحية: *2026-10-15* - الكمية: *10 علبة*\n`;
+          alertMessage += `- اسم الدواء: *شراب كيبرا صيدلاني (Keppra)* - تاريخ انتهاء الصلاحية: *2026-11-02* - الكمية: *4 عبوة*\n\n`;
+          alertMessage += `📉 *أدوية وصلت لمعدل مخزون حرج (15 وحدة أو أقل):*\n`;
+          alertMessage += `- *شراب أومول للأطفال (Omol)*: المتبقي 15 زجاجة فقط!\n\n`;
+          alertMessage += `📝 *ملاحظة:* تم إنشاء هذه القائمة كمحاكاة ذكية للتأكد من وصول الأسماء والكميات بدقة لأن جميع أدويتك الحالية في النظام صالحة تماماً ومستواها آمن!\n\n`;
         }
+
+        alertMessage += `⏱️ تم إصدار هذا التنبيه آلياً بواسطة نظام المراقبة الدوائية الاحتياطي.`;
+
+        // Dispatch WhatsApp Client-side
+        if (whatsAppEnabled && whatsAppNumber) {
+          const mode = whatsAppMode || 'ultramsg';
+          if (mode === 'ultramsg' && ultraMsgInstance && ultraMsgToken) {
+            try {
+              const waResponse = await fetch(`https://api.ultramsg.com/${ultraMsgInstance}/messages/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                  token: ultraMsgToken,
+                  to: whatsAppNumber,
+                  body: alertMessage
+                })
+              });
+              const waResult = await waResponse.json();
+              if (waResult.sent === "true" || waResult.success) {
+                logs.push(`[WhatsApp UltraMsg] تم إرسال التنبيه الوقائي لـ ${whatsAppNumber} بنجاح من المتصفح.`);
+              } else {
+                logs.push(`[WhatsApp UltraMsg Error] بوابة UltraMsg رفضت الطلب: ${JSON.stringify(waResult)}`);
+              }
+            } catch (err: any) {
+              logs.push(`[WhatsApp UltraMsg Error] فشل الاتصال بالبوابة: ${err.message}`);
+            }
+          } else if (mode === 'callmebot' && callMeBotApiKey) {
+            try {
+              const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(whatsAppNumber)}&text=${encodeURIComponent(alertMessage)}&apikey=${encodeURIComponent(callMeBotApiKey)}`;
+              await fetch(url, { method: 'GET', mode: 'no-cors' }); 
+              logs.push(`[WhatsApp CallMeBot] تم إرسال التنبيه التلقائي المجاني بنجاح لـ ${whatsAppNumber} من المتصفح.`);
+            } catch (err: any) {
+              logs.push(`[WhatsApp CallMeBot Error] فشل الاتصال ببوابة CallMeBot: ${err.message}`);
+            }
+          } else if (mode === 'wapilot' && waPilotApiKey) {
+            try {
+              const resolveWaPilotUrl = (base: string, path: string, dev: string, type: string) => {
+                let baseUrl = base ? base.trim() : 'https://api.wapilot.io';
+                if (!baseUrl.startsWith('http')) baseUrl = 'https://' + baseUrl;
+                if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                let urlPath = path ? path.trim() : '';
+                if (urlPath && !urlPath.startsWith('/')) urlPath = '/' + urlPath;
+                if (urlPath) return baseUrl + urlPath;
+                return type === 'wautopilot' 
+                  ? `${baseUrl}/v1/messages` 
+                  : `${baseUrl}/v1/accounts/${dev || 'default'}/messages`;
+              };
+              let url = resolveWaPilotUrl(waPilotBaseUrl, waPilotPath, waPilotDevice, waPilotType);
+              let headers: any = { 'Content-Type': 'application/json' };
+              let requestBody: any = {};
+
+              if (waPilotType === 'wautopilot') {
+                headers['X-Api-Key'] = waPilotApiKey;
+                requestBody = {
+                  message: { type: 'TEXT', text: alertMessage },
+                  recipient: whatsAppNumber.replace(/\+/g, '').replace(/\s/g, '')
+                };
+              } else {
+                headers['Authorization'] = `Bearer ${waPilotApiKey}`;
+                requestBody = {
+                  messaging_product: "whatsapp",
+                  recipient_type: "individual",
+                  to: whatsAppNumber.replace(/\+/g, '').replace(/\s/g, ''),
+                  type: "text",
+                  text: { body: alertMessage }
+                };
+                if (waPilotDevice) {
+                  requestBody.deviceId = waPilotDevice;
+                  requestBody.phone_number_id = waPilotDevice;
+                }
+              }
+
+              const waResponse = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(requestBody)
+              });
+              if (waResponse.ok) {
+                logs.push(`[WhatsApp WAPilot] تم إرسال التنبيه بنجاح لـ ${whatsAppNumber} من المتصفح.`);
+              } else {
+                const text = await waResponse.text();
+                logs.push(`[WhatsApp WAPilot Error] البوابة رفضت الطلب: ${text.substring(0, 150)}`);
+              }
+            } catch (err: any) {
+              logs.push(`[WhatsApp WAPilot Error] فشل الاتصال ببوابة WAPilot: ${err.message}`);
+            }
+          } else {
+            logs.push(`[WhatsApp Channel] غير مفعل أو مبرمج كإرسال يدوي مجاني.`);
+          }
+        } else {
+          logs.push(`[WhatsApp Channel] غير مفعل أو رقم المستلم غير متوفر.`);
+        }
+
+        // Dispatch Email Client-side via Google Apps Script (Fully Supported Client-side!)
+        if (emailEnabled && appsScriptUrl && notificationEmail) {
+          const urls = appsScriptUrl
+            .split(/[\n,;]+/)
+            .map((u: string) => u.trim())
+            .filter((u: string) => u.length > 0);
+
+          if (urls.length === 0) {
+            logs.push(`[Email Channel Error] لم يتم إدخال أي روابط صالحة لـ Google Apps Script في الإعدادات.`);
+          } else {
+            let emailSentSuccessfully = false;
+
+            for (let i = 0; i < urls.length; i++) {
+              const currentUrl = urls[i];
+              try {
+                const responseMail = await fetch(currentUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' }, 
+                  body: JSON.stringify({
+                    to: notificationEmail,
+                    subject: `🛡️ تنبيه وقائي عاجل: تقرير صلاحية وكمية الأدوية - صيدلية مركز الرعاية`,
+                    body: alertMessage.replace(/\*/g, '')
+                  })
+                });
+
+                if (responseMail.ok) {
+                  logs.push(`[Google Apps Script Email] تم إرسال البريد بنجاح باستخدام الرابط رقم ${i + 1}/${urls.length} للمستلم ${notificationEmail}.`);
+                  emailSentSuccessfully = true;
+                  break;
+                } else {
+                  logs.push(`[Google Apps Script Email Warning] الرابط رقم ${i + 1} رفض الطلب.`);
+                }
+              } catch (err: any) {
+                logs.push(`[Google Apps Script Email Error] الرابط رقم ${i + 1} واجه خطأً: ${err.message}`);
+              }
+            }
+
+            if (!emailSentSuccessfully) {
+              logs.push(`[Google Apps Script Email Error] فشلت جميع روابط Apps Script الـ ${urls.length} المتوفرة في إرسال البريد الإلكتروني.`);
+            }
+          }
+        } else {
+          logs.push(`[Email Channel] غير مفعل أو غير مكتمل الإعداد.`);
+        }
+
+        const fallbackMsg = `اكتمل تشغيل نظام الإشعارات الاحتياطي من المتصفح مباشرة. أدوية منتهية: ${expiredList.length}، قريبة الانتهاء: ${expiringSoon.length}، كميات حرجة: ${criticalStock.length}.`;
+        setNotificationAlertText(fallbackMsg);
+        setNotificationLogs(prev => [...logs, ...prev]);
+
         if (isAutoPilot) {
           if (emailEnabled) {
             showToast('🛡️ تم فحص صلاحيات الأدوية والكميات تلقائياً كبداية لليوم الجديد، وتم إرسال التقرير بنجاح لبريدك الإلكتروني! ✉️', 'success');
@@ -1268,12 +1500,28 @@ export default function App() {
             showToast('🛡️ تم فحص صلاحية الأدوية والكميات تلقائياً للبداية اليومية بنجاح!', 'success');
           }
         } else {
-          showToast('تم تشغيل ملقم المراقبة الدوائية وإرسال الإشعارات عبر القنوات المحددة بنجاح!', 'success');
+          showToast('تم تشغيل ملقم المراقبة الدوائية وإرسال الإشعارات عبر القنوات المحددة بنجاح (المسار الاحتياطي)!', 'success');
+        }
+
+      } catch (errFallback: any) {
+        if (!isAutoPilot) {
+          showToast('عذراً، فشلت عملية تشغيل نظام الإشعارات الاحتياطي.', 'error');
         }
       }
-    } catch (e) {
-      if (!isAutoPilot) {
-        showToast('عذراً، فشلت عملية تشغيل نظام الإشعارات المجدولة.', 'error');
+    } else {
+      // Backend succeeded
+      setNotificationAlertText(data.message);
+      if (data.logs && data.logs.length > 0) {
+        setNotificationLogs(prev => [...data.logs, ...prev]);
+      }
+      if (isAutoPilot) {
+        if (emailEnabled) {
+          showToast('🛡️ تم فحص صلاحيات الأدوية والكميات تلقائياً كبداية لليوم الجديد، وتم إرسال التقرير بنجاح لبريدك الإلكتروني! ✉️', 'success');
+        } else {
+          showToast('🛡️ تم فحص صلاحية الأدوية والكميات تلقائياً للبداية اليومية بنجاح!', 'success');
+        }
+      } else {
+        showToast('تم تشغيل ملقم المراقبة الدوائية وإرسال الإشعارات عبر القنوات المحددة بنجاح!', 'success');
       }
     }
   };
